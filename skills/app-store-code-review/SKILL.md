@@ -359,6 +359,190 @@ digraph review_flow {
 - [ ] Preview video (optional but recommended)
 - [ ] Category selected appropriately
 
+## Legal Templates
+
+Use these templates when creating legal pages for App Store submission. Replace bracketed placeholders.
+
+### Terms of Service (Template - adapted from PageEcho)
+
+```markdown
+# Terms of Service
+
+Last updated: [MONTH YYYY]
+
+## 1. Acceptance of Terms
+
+By accessing or using [APP_NAME] (the "Service"), you agree to be bound by these Terms of Service. If you do not agree to these terms, do not use the Service. Additional guidelines or rules may apply to specific features and are incorporated by reference.
+
+## 2. Description of Service
+
+[APP_NAME] is a [SHORT DESCRIPTION]. The Service allows users to [CORE FEATURES]. Some features may rely on on-device AI models and optional plugins.
+
+## 3. User Conduct
+
+You agree to use the Service only for lawful purposes and in compliance with applicable laws and regulations. You are prohibited from using the Service to impersonate others without consent, to create deceptive or harmful content, or to violate intellectual property rights.
+
+## 4. Intellectual Property
+
+The Service and its original content (excluding user-provided content) are the exclusive property of [COMPANY_NAME] and its licensors. You retain ownership of your content. Nothing in these terms grants you the right to use [COMPANY_NAME] trademarks or branding without permission.
+
+## 5. AI Features Disclaimer
+
+AI-generated outputs may be inaccurate, imperfect, or unsuitable for critical use cases. You should verify important information using original sources.
+
+## 6. Disclaimer of Warranties
+
+The Service is provided on an "AS IS" and "AS AVAILABLE" basis. [COMPANY_NAME] makes no warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and noninfringement.
+
+## 7. Limitation of Liability
+
+In no event shall [COMPANY_NAME] be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the Service.
+
+## 8. Changes to Terms
+
+[COMPANY_NAME] reserves the right, at its sole discretion, to modify or replace these Terms at any time. Continued use of the Service after changes constitutes acceptance of the updated terms.
+
+## 9. Contact Us
+
+If you have questions about these Terms, contact us at [CONTACT_EMAIL] or [CONTACT_URL].
+
+## 10. External Content Sources
+
+The Service may provide access to or include third-party models, datasets, or libraries. These contents are provided by their respective sources and are subject to their own licenses. You are responsible for ensuring your use complies with applicable laws and third-party terms.
+
+## 11. Apple Standard EULA
+
+If the app is distributed through the Apple App Store, the Apple Standard EULA applies: https://www.apple.com/legal/internet-services/itunes/dev/stdeula/.
+
+## 12. Paid Features
+
+If paid features are offered, purchases are processed by the storefront or payment provider and are governed by their terms. Subscription management and cancellations are handled through your account with that provider.
+```
+
+### Privacy Policy (Template)
+
+```markdown
+# Privacy Policy
+
+Last updated: [MONTH YYYY]
+
+## 1. Introduction
+
+[APP_NAME] ("we," "our," or "us") respects your privacy and is committed to protecting it. This Privacy Policy explains how we handle information when you use the app.
+
+## 2. Information Collection
+
+The app is designed to be local-first. We do not collect personal information by default. We do not track usage behavior or sell data to third parties. Your content remains on your device unless you choose to share it.
+
+## 3. On-Device Processing
+
+AI features run locally using on-device models. Your content is processed entirely on your device and is not sent to external servers for processing.
+
+## 4. Data Storage
+
+Files you import or generate are stored locally in locations you select. You control when and how to delete or share this data.
+
+## 5. Third-Party Services
+
+The app may utilize system-level services provided by your operating system. Optional update or license checks may transmit basic app and device metadata (such as version and OS information), but no user content is transmitted. If third-party services are enabled in future releases, this policy will be updated accordingly.
+
+## 6. Data Security
+
+Since data stays on your device, its security depends on your device security settings. We recommend using passcodes or biometrics where available.
+
+## 7. Children's Privacy
+
+The Service does not address anyone under the age of 13. We do not knowingly collect personal information from children under 13.
+
+## 8. Changes to This Privacy Policy
+
+We may update this Privacy Policy from time to time. We will notify you of any changes by posting the new policy and updating the "Last updated" date.
+
+## 9. Contact Us
+
+If you have any questions about this Privacy Policy, contact us at [CONTACT_EMAIL] or [CONTACT_URL].
+```
+
+### Business Source License 1.1 (Template)
+
+```text
+Business Source License 1.1
+
+Parameters
+Licensor: [COMPANY_NAME]
+Licensed Work: [APP_NAME]
+Additional Use Grant: [None or limited production use]
+Change Date: [YYYY-MM-DD]
+Change License: [GPL-2.0-or-later or compatible license]
+
+Terms
+
+The Licensor hereby grants you the right to copy, modify, create derivative
+works, redistribute, and make non-production use of the Licensed Work. The
+Licensor may make an Additional Use Grant, above, permitting limited
+production use.
+
+Effective on the Change Date, or the fourth anniversary of the first publicly
+available distribution of a specific version of the Licensed Work under this
+License, whichever comes first, the Licensor hereby grants you rights under
+the terms of the Change License, and the rights granted in the paragraph
+above terminate.
+
+If your use of the Licensed Work does not comply with the requirements
+currently in effect as described in this License, you must purchase a
+commercial license from the Licensor, its affiliated entities, or authorized
+resellers, or you must refrain from using the Licensed Work.
+
+All copies of the original and modified Licensed Work, and derivative works
+of the Licensed Work, are subject to this License. This License applies
+separately for each version of the Licensed Work and the Change Date may vary
+for each version of the Licensed Work released by Licensor.
+
+You must conspicuously display this License on each original or modified copy
+of the Licensed Work. If you receive the Licensed Work in original or
+modified form from a third party, the terms and conditions set forth in this
+License apply to your use of that work.
+
+Any use of the Licensed Work in violation of this License will automatically
+terminate your rights under this License for the current and all other
+versions of the Licensed Work.
+
+This License does not grant you any right in any trademark or logo of
+Licensor or its affiliates (provided that you may use a trademark or logo of
+Licensor as expressly required by this License).
+
+TO THE EXTENT PERMITTED BY APPLICABLE LAW, THE LICENSED WORK IS PROVIDED ON
+AN "AS IS" BASIS. LICENSOR HEREBY DISCLAIMS ALL WARRANTIES AND CONDITIONS,
+EXPRESS OR IMPLIED, INCLUDING (WITHOUT LIMITATION) WARRANTIES OF
+MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE, NON-INFRINGEMENT, AND
+TITLE.
+
+MariaDB hereby grants you permission to use this License's text to license
+your works, and to refer to it using the trademark "Business Source License",
+as long as you comply with the Covenants of Licensor below.
+
+Covenants of Licensor
+
+In consideration of the right to use this License's text and the "Business
+Source License" name and trademark, Licensor covenants to MariaDB, and to all
+other recipients of the licensed work to be provided by Licensor:
+
+1. To specify as the Change License the GPL Version 2.0 or any later version,
+   or a license that is compatible with GPL Version 2.0 or a later version,
+   where "compatible" means that software provided under the Change License can
+   be included in a program with software provided under GPL Version 2.0 or a
+   later version. Licensor may specify additional Change Licenses without
+   limitation.
+
+2. To either: (a) specify an additional grant of rights to use that does not
+   impose any additional restriction on the right granted in this License, as
+   the Additional Use Grant; or (b) insert the text "None".
+
+3. To specify a Change Date.
+
+4. Not to modify this License in any other way.
+```
+
 ## Report Format
 
 Generate report with this structure:
