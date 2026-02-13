@@ -11,6 +11,21 @@ Systematic code review process for applications targeting Apple App Store, Googl
 
 This skill now includes a mandatory cross-repo consistency pass for macOS app websites + README licensing language before release.
 
+## Repository Layout (Mandatory in This Workspace)
+
+All macOS app projects must follow this structure under `artifacts/code`:
+
+- `artifacts/code/<AppName>PRJ/<AppName>CODE` - source code repository
+- `artifacts/code/<AppName>PRJ/<AppName>WEB` - static website repository (moved from `artifacts/all-web`)
+
+For licensing and legal checks, always use these surfaces:
+
+- **README surface:** `<AppName>CODE/README.md`
+- **Flutter app surface:** `<AppName>CODE/flutter_app/` (legal screens + bundled app resources)
+- **Website surface:** `<AppName>WEB/` (`index.html`, `license.html`, `privacy.html`, `terms.html`, `privacy-consent.js`)
+
+Do not create or update app sites in `artifacts/all-web` for these macOS apps.
+
 ## When to Use
 
 - Before App Store/Play Store submission
@@ -35,9 +50,10 @@ digraph review_flow {
     "4. Security" -> "5. Data Persistence";
     "5. Data Persistence" -> "6. Platform Compliance";
     "6. Platform Compliance" -> "7. Error Handling";
-    "7. Error Handling" -> "8. Performance";
-    "8. Performance" -> "9. Product Information";
-    "9. Product Information" -> "Generate Report";
+    "7. Error Handling" -> "8. MCP Integration (macOS)";
+    "8. MCP Integration (macOS)" -> "9. Performance";
+    "9. Performance" -> "10. Product Information";
+    "10. Product Information" -> "Generate Report";
 }
 ```
 
@@ -269,7 +285,149 @@ digraph review_flow {
 - [ ] App state recoverable after crash
 - [ ] Graceful degradation when features unavailable
 
-## 8. Performance Checklist
+## 8. MCP Tool Integration Checklist (Required for macOS Apps)
+
+macOS apps MUST expose full functionality via MCP (Model Context Protocol) tools to enable Claude integration. This ensures AI assistants can interact with the app programmatically.
+
+### MCP Server Requirements
+- [ ] MCP server script exists at `bin/<appname>_mcp_server.py` or similar
+- [ ] Server implements JSON-RPC 2.0 over HTTP protocol
+- [ ] Server handles MCP methods: `initialize`, `tools/list`, `tools/call`
+- [ ] Server binds to configurable host/port (default: `127.0.0.1:80XX`)
+- [ ] Server logs to `runs/logs/<appname>_mcp_server.log` with rotation
+- [ ] Backend URL configurable via environment variable (e.g., `<APPNAME>_BACKEND_URL`)
+
+### MCP Tool Definitions
+- [ ] `MCP_TOOLS` list contains all available tools
+- [ ] Each tool has required keys: `name`, `description`, `inputSchema`
+- [ ] Tool names are unique and follow `<domain>_<action>` pattern (e.g., `tts_generate_kokoro`)
+- [ ] `inputSchema` is a valid JSON Schema with `type: "object"`
+- [ ] Required parameters listed in `inputSchema.required` array
+- [ ] Tool descriptions are clear and explain what the tool does
+
+### Required MCP Tools (minimum set)
+- [ ] `health_check` - Check if backend is running and healthy
+- [ ] `<domain>_status` or `system_info` - Get system/service information
+- [ ] `<domain>_list_*` - List available resources (voices, models, files, etc.)
+- [ ] `<domain>_<primary_action>` - Core functionality (generate, process, create)
+
+### MCP Tool Schema Pattern (Reference: MimikaStudio)
+```python
+MCP_TOOLS = [
+    {
+        "name": "app_speak",
+        "description": "Generate and play speech with specified text and voice.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to speak"},
+                "speaker": {"type": "string", "description": "Voice/speaker name"},
+                "quality_mode": {
+                    "type": "string",
+                    "enum": ["fast", "balanced", "quality"],
+                    "description": "Quality mode (fast=realtime)"
+                }
+            },
+            "required": ["text"]
+        }
+    },
+    {
+        "name": "app_speak_streaming",
+        "description": "Generate speech with sentence-by-sentence streaming.",
+        "inputSchema": {
+            "type": "object",
+            "properties": {
+                "text": {"type": "string", "description": "Text to speak (supports multiple sentences)"}
+            },
+            "required": ["text"]
+        }
+    },
+    {
+        "name": "app_status",
+        "description": "Check service status and available resources.",
+        "inputSchema": {"type": "object", "properties": {}}
+    }
+]
+```
+
+### HTTP API Parity
+- [ ] All MCP tools have corresponding HTTP API endpoints
+- [ ] HTTP API follows RESTful conventions:
+  - `GET /api/<domain>/status` - Status check
+  - `GET /api/<domain>/<resources>` - List resources
+  - `POST /api/<domain>/<action>` - Perform actions
+  - `DELETE /api/<domain>/<resource>/<id>` - Delete resources
+- [ ] HTTP API example (curl):
+```bash
+# Generate speech
+curl -X POST http://localhost:8000/speak \
+  -H "Content-Type: application/json" \
+  -d '{"text": "Hello", "speaker": "default", "quality_mode": "balanced"}'
+
+# Check status
+curl http://localhost:8000/status
+
+# List voices
+curl http://localhost:8000/voices
+```
+
+### MCP Server Handler Pattern
+```python
+class MCPHandler(BaseHTTPRequestHandler):
+    def do_POST(self):
+        # Parse JSON-RPC request
+        obj = json.loads(self.rfile.read(...))
+        method = obj.get("method")
+        params = obj.get("params") or {}
+
+        if method == "initialize":
+            # Return server info and capabilities
+            return {"protocolVersion": "...", "serverInfo": {...}, "capabilities": {...}}
+
+        if method in ("tools/list", "tools.list"):
+            return {"tools": MCP_TOOLS}
+
+        if method in ("tools/call", "tools.call"):
+            result = handle_tool_call(params.get("name"), params.get("arguments"))
+            return {"content": [{"type": "text", "text": result}]}
+```
+
+### MCP Tests
+- [ ] Unit tests for tool definitions (`test_mcp_server.py`)
+- [ ] Test each tool has required keys
+- [ ] Test tool names are unique
+- [ ] Test tool call handler dispatches correctly
+- [ ] Test JSON-RPC protocol handling (initialize, tools/list, tools/call)
+- [ ] Test error handling for unknown tools and malformed requests
+
+### Claude Code Configuration
+- [ ] MCP server registered in Claude Code settings or documented for user setup
+- [ ] Configuration example provided in README:
+```json
+{
+  "mcpServers": {
+    "<appname>": {
+      "command": "python3",
+      "args": ["/path/to/bin/<appname>_mcp_server.py", "--port", "80XX"],
+      "env": {
+        "<APPNAME>_BACKEND_URL": "http://localhost:8000"
+      }
+    }
+  }
+}
+```
+
+### Common MCP Integration Issues
+| Issue | Pattern | Fix |
+|-------|---------|-----|
+| Missing tools | No MCP server | Create `bin/<appname>_mcp_server.py` |
+| No tool schemas | Tools missing inputSchema | Add JSON Schema for each tool |
+| Backend not proxied | MCP calls backend directly | Use `_call_backend()` helper pattern |
+| No error handling | Exceptions crash server | Wrap tool calls in try/except |
+| No logging | Silent failures | Add rotating file logger |
+| Hardcoded ports | Port conflicts | Make host/port configurable |
+
+## 9. Performance Checklist
 
 ### Startup
 - [ ] Cold start < 3 seconds
@@ -292,7 +450,7 @@ digraph review_flow {
 - [ ] Background refresh minimal
 - [ ] No unnecessary polling
 
-## 9. Product Information Checklist
+## 10. Product Information Checklist
 
 ### Required App Information
 - [ ] Version number displayed in app (Settings or About page)
@@ -332,23 +490,25 @@ digraph review_flow {
 - [ ] Binary distribution license / EULA page (DMG/executable terms)
 - [ ] Repo `LICENSE` file present and referenced in README
 - [ ] All legal pages accessible from Settings or About
+- [ ] Website legal pages exist in `<AppName>WEB`: `index.html`, `license.html`, `privacy.html`, `terms.html`
 
 ### License Integration (Source vs Binary)
-- [ ] Create root `LICENSE` for source code (BSL-style, parameterized)
-- [ ] Create root `BINARY-LICENSE.txt` (or `EULA-DMG.txt`) for DMG/executable
-- [ ] Add `LICENSE.md` (or `docs/licensing.md`) explaining source vs binary terms
-- [ ] Update README License section with links to `LICENSE`, `BINARY-LICENSE.txt`, and `LICENSE.md`
+- [ ] Create `<AppName>CODE/LICENSE` for source code (BSL-style, parameterized)
+- [ ] Create `<AppName>CODE/BINARY-LICENSE.txt` (or `EULA-DMG.txt`) for DMG/executable
+- [ ] Add `<AppName>CODE/LICENSE.md` (or `<AppName>CODE/docs/licensing.md`) explaining source vs binary terms
+- [ ] Update `<AppName>CODE/README.md` License section with links to `LICENSE`, `BINARY-LICENSE.txt`, and `LICENSE.md`
 - [ ] UI integration: About footer mentions license + binary restriction; Legal section links to License page
 - [ ] Terms of Service includes binary distribution restrictions and link to `BINARY-LICENSE.txt`
 - [ ] Bundle both license files into the app (`Contents/Resources/`) and DMG root
+- [ ] Website license page `<AppName>WEB/license.html` matches README and repo license files
 
 ### Three-Surface License Completeness (Required)
-- [ ] Website licenses are written and published (not placeholders): `license.html` must clearly state source license and binary distribution license terms.
-- [ ] Website hero/meta references to licensing (`Open Source`, `License`) link to `license.html`.
-- [ ] Flutter macOS app licenses are written and visible: in-app Legal/License screen must include or link to source + binary terms.
+- [ ] Website licenses are written and published in `<AppName>WEB/license.html` (not placeholders) and clearly state source + binary terms.
+- [ ] Website hero/meta references to licensing (`Open Source`, `License`) link to `<AppName>WEB/license.html`.
+- [ ] Flutter macOS app licenses are written and visible in `<AppName>CODE/flutter_app` legal screens; source + binary terms are discoverable in-app.
 - [ ] Flutter macOS app bundle contains written license files: `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`.
-- [ ] Git repository licenses are written and versioned: root `LICENSE` + `BINARY-LICENSE.txt` + license overview doc (`LICENSE.md` or `docs/licensing.md`).
-- [ ] README top section and License section both link to the written repo license files and website license page.
+- [ ] Git repository licenses are written and versioned in `<AppName>CODE`: `LICENSE` + `BINARY-LICENSE.txt` + license overview doc (`LICENSE.md` or `docs/licensing.md`).
+- [ ] `<AppName>CODE/README.md` top section and License section both link to the repo license files and website license page.
 - [ ] Release is blocked if any one of the three surfaces (website, app, repo) is missing written license content.
 
 ### Cross-Repo Website + README Consistency (Mandatory)
@@ -361,9 +521,20 @@ digraph review_flow {
 - [ ] Link `Open Source` labels in website hero/meta rows to `license.html` (not plain text).
 - [ ] In website hero badges/benefits, remove `Lifetime Updates` and avoid reintroducing it in future copy revisions.
 - [ ] Add a primary `Download for macOS` CTA on the left hero column before `Get Started` / `View on GitHub` style links.
-- [ ] Ensure each macOS app site under the web portfolio uses the same wording pattern (only app name varies).
-- [ ] Verify `LICENSE`, `BINARY-LICENSE.txt`, and `license.html` all exist and are mutually consistent.
-- [ ] In multi-repo web updates, stage and commit only intended files (usually `index.html`) when worktrees are already dirty.
+- [ ] Ensure each macOS app site under `<AppName>WEB` uses the same wording pattern (only app name varies).
+- [ ] Verify `<AppName>CODE/LICENSE`, `<AppName>CODE/BINARY-LICENSE.txt`, and `<AppName>WEB/license.html` all exist and are mutually consistent.
+- [ ] In multi-repo updates, stage and commit only intended files from `<AppName>CODE` and `<AppName>WEB` when worktrees are already dirty.
+
+### Website Privacy Consent Popup (Mandatory Across All App Sites)
+- [ ] Every app website in `<AppName>WEB` includes a Mimika-style GDPR consent popup script at `<AppName>WEB/privacy-consent.js`.
+- [ ] `privacy-consent.js` is loaded on all public pages (minimum): `index.html`, `license.html`, `privacy.html`, `terms.html`.
+- [ ] Popup provides **both** actions: `Accept` and `Reject` (no single-button consent).
+- [ ] Consent is persisted in `localStorage` with app-specific keys (do not reuse another app's key names).
+- [ ] Privacy popup text links to the app's own `privacy.html` and `terms.html`.
+- [ ] Analytics or tracking initialization runs **only after explicit Accept**.
+- [ ] Banner remains hidden after a saved decision and reappears only when no decision exists.
+- [ ] Mobile layout is responsive and readable (buttons accessible on narrow screens).
+- [ ] Release is blocked if any `<AppName>WEB` site lacks this popup behavior.
 
 ### Contributor Identity Hygiene (Git)
 - [ ] Audit contributors before release:
@@ -402,6 +573,10 @@ digraph review_flow {
 
 ### Branding & Assets
 - [ ] App icon at all required sizes
+- [ ] Custom branded icon exists for this app (no reused template/stock icon from another app)
+- [ ] Canonical icon source is versioned in `<AppName>CODE/assets/` (e.g., `app_icon_source.png` at 1024x1024)
+- [ ] macOS icon set in `<AppName>CODE/flutter_app/macos/Runner/Assets.xcassets/AppIcon.appiconset/` is generated from that canonical source
+- [ ] Website favicon/icons are generated from the same canonical icon source to keep branding consistent
 - [ ] Consistent branding throughout app
 - [ ] Splash/launch screen matches branding
 
@@ -756,6 +931,18 @@ Generate report with this structure:
 | Deprecated Flutter API | `withOpacity()` usage | Replace with `withValues(alpha:)` |
 | No dark mode | Only light theme | Add `ThemeMode.system` support |
 
+### MCP Integration (macOS Apps)
+| Issue | Pattern | Fix |
+|-------|---------|-----|
+| No MCP server | App not Claude-accessible | Add `bin/<app>_mcp_server.py` |
+| Missing tool schemas | `inputSchema` undefined | Add JSON Schema with properties/required |
+| No health_check tool | Can't verify backend | Add `health_check` MCP tool |
+| Hardcoded backend URL | Can't configure | Use env var (e.g., `APP_BACKEND_URL`) |
+| No MCP tests | Integration untested | Add `test_mcp_server.py` |
+| HTTP/MCP mismatch | Tools don't match API | Ensure 1:1 parity between MCP tools and HTTP endpoints |
+| No logging | Silent MCP failures | Add rotating file handler to `runs/logs/` |
+| Port conflicts | Multiple apps clash | Make `--host`/`--port` configurable |
+
 ## Quick Commands
 
 After review, offer to fix issues:
@@ -778,6 +965,8 @@ After review, offer to fix issues:
 - Missing About page or version display
 - No privacy policy in app
 - Missing `LICENSE` or `BINARY-LICENSE.txt`
+- Missing `<AppName>CODE/README.md` license links or mismatch with `<AppName>WEB/license.html`
+- Missing GDPR popup script (`privacy-consent.js`) on any app website page
 - Author not set to Qneura.ai
 - No accessibility testing done
 - No `bin/appctl` control script
@@ -785,3 +974,7 @@ After review, offer to fix issues:
 - No `issues.sh` diagnostic script
 - Using deprecated `withOpacity()` instead of `withValues(alpha:)`
 - No dark mode support
+- No MCP server for macOS app (missing `bin/*_mcp_server.py`)
+- MCP tools missing inputSchema or description
+- No HTTP API parity with MCP tools
+- MCP server not configurable (hardcoded ports/URLs)
