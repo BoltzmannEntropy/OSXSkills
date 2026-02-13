@@ -9,6 +9,8 @@ description: Use when preparing mobile/desktop apps for App Store submission, be
 
 Systematic code review process for applications targeting Apple App Store, Google Play, or desktop distribution. Identifies crash risks, security vulnerabilities, resource leaks, and compliance issues that cause rejection or poor user experience.
 
+This skill now includes a mandatory cross-repo consistency pass for macOS app websites + README licensing language before release.
+
 ## When to Use
 
 - Before App Store/Play Store submission
@@ -96,6 +98,8 @@ digraph review_flow {
 - [ ] Listeners/observers removed
 - [ ] Background tasks cancelled on screen exit
 - [ ] File handles closed in finally blocks
+- [ ] Voice-clone pipelines profiled with Instruments (Allocations + Leaks) for full clone lifecycle (load model -> clone -> teardown)
+- [ ] Add standalone clone regression tests using `Natasha` and `Suzan` voices to detect runaway memory growth or unreleased buffers
 
 ### File System
 - [ ] Temp files cleaned up
@@ -214,6 +218,9 @@ digraph review_flow {
 - [ ] Volume name and window layout configured
 - [ ] SHA256 hash generated alongside DMG (`.dmg.sha256`)
 - [ ] Version extracted from centralized version file
+- [ ] DMG root includes `LICENSE` (source) and `BINARY-LICENSE.txt` (binary/EULA)
+- [ ] App bundle embeds `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`
+- [ ] DMG license agreement configured (when supported by the DMG toolchain)
 
 ### Project Scripts (Reference: flutter-python-fullstack pattern)
 - [ ] **Control script** (`bin/appctl`):
@@ -310,17 +317,54 @@ digraph review_flow {
   - [ ] Website: https://qneura.ai/apps.html
   - [ ] GitHub repository (if open source)
   - [ ] Report Issue / Bug tracker
+- [ ] License link (in-app License screen or repo license overview)
 - [ ] **Credits/Powered By section** listing dependencies with clickable links
 - [ ] **Footer** with:
-  - [ ] License type (e.g., "Licensed under GPL v3.0")
+  - [ ] License type (e.g., "Licensed under BSL-1.1")
+  - [ ] Binary distribution restriction summary (if applicable)
   - [ ] Copyright: "© [YEAR] Qneura.ai"
   - [ ] Clickable Qneura.ai link to https://qneura.ai
 
 ### Legal Pages
 - [ ] Privacy Policy page (required by App Store)
 - [ ] Terms of Service / EULA page
-- [ ] License page (open source attributions if applicable)
+- [ ] License overview page (source vs binary terms, plain English)
+- [ ] Binary distribution license / EULA page (DMG/executable terms)
+- [ ] Repo `LICENSE` file present and referenced in README
 - [ ] All legal pages accessible from Settings or About
+
+### License Integration (Source vs Binary)
+- [ ] Create root `LICENSE` for source code (BSL-style, parameterized)
+- [ ] Create root `BINARY-LICENSE.txt` (or `EULA-DMG.txt`) for DMG/executable
+- [ ] Add `LICENSE.md` (or `docs/licensing.md`) explaining source vs binary terms
+- [ ] Update README License section with links to `LICENSE`, `BINARY-LICENSE.txt`, and `LICENSE.md`
+- [ ] UI integration: About footer mentions license + binary restriction; Legal section links to License page
+- [ ] Terms of Service includes binary distribution restrictions and link to `BINARY-LICENSE.txt`
+- [ ] Bundle both license files into the app (`Contents/Resources/`) and DMG root
+
+### Cross-Repo Website + README Consistency (Mandatory)
+- [ ] Use this canonical sentence (copy exactly, replace app name only):
+  - `License: Source code is licensed under Business Source License 1.1 (BSL-1.1), and binary distributions are licensed under the [APP_NAME] Binary Distribution License. See LICENSE, BINARY-LICENSE.txt, and the website License page.`
+- [ ] Place the canonical sentence in README near the top, immediately after the primary app-description paragraph.
+- [ ] Keep the binary-availability sentence explicit in README and website CTA/meta:
+  - `The codebase is cross-platform, but we currently provide macOS binaries only.`
+- [ ] Link `we currently provide macOS binaries only.` in README top block to the app website home page.
+- [ ] Link `Open Source` labels in website hero/meta rows to `license.html` (not plain text).
+- [ ] In website hero badges/benefits, remove `Lifetime Updates` and avoid reintroducing it in future copy revisions.
+- [ ] Add a primary `Download for macOS` CTA on the left hero column before `Get Started` / `View on GitHub` style links.
+- [ ] Ensure each macOS app site under the web portfolio uses the same wording pattern (only app name varies).
+- [ ] Verify `LICENSE`, `BINARY-LICENSE.txt`, and `license.html` all exist and are mutually consistent.
+- [ ] In multi-repo web updates, stage and commit only intended files (usually `index.html`) when worktrees are already dirty.
+
+### Contributor Identity Hygiene (Git)
+- [ ] Audit contributors before release:
+  - `git shortlog -sne --all`
+  - `git log --all --format='%H%x09%an%x09%ae'`
+  - scan commit bodies for `Co-authored-by`
+- [ ] If alias/noise identities exist, add `.mailmap` canonical mappings to the project owner identity.
+- [ ] Re-check shortlog after `.mailmap` update to confirm consolidation.
+- [ ] Verify remote contributor view (`/contributors` API or GitHub UI) before attempting history rewrite.
+- [ ] Do **not** rewrite published git history unless explicitly requested and approved by the user.
 
 ### Support & Contact
 - [ ] Support email or contact form
@@ -384,7 +428,7 @@ You agree to use the Service only for lawful purposes and in compliance with app
 
 ## 4. Intellectual Property
 
-The Service and its original content (excluding user-provided content) are the exclusive property of [COMPANY_NAME] and its licensors. You retain ownership of your content. Nothing in these terms grants you the right to use [COMPANY_NAME] trademarks or branding without permission.
+The Service and its original content (excluding user-provided content) are the exclusive property of QNeura.ai and its licensors. You retain ownership of your content. Nothing in these terms grants you the right to use QNeura.ai trademarks or branding without permission.
 
 ## 5. AI Features Disclaimer
 
@@ -392,19 +436,19 @@ AI-generated outputs may be inaccurate, imperfect, or unsuitable for critical us
 
 ## 6. Disclaimer of Warranties
 
-The Service is provided on an "AS IS" and "AS AVAILABLE" basis. [COMPANY_NAME] makes no warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and noninfringement.
+The Service is provided on an "AS IS" and "AS AVAILABLE" basis. QNeura.ai makes no warranties of any kind, express or implied, including but not limited to warranties of merchantability, fitness for a particular purpose, and noninfringement.
 
 ## 7. Limitation of Liability
 
-In no event shall [COMPANY_NAME] be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the Service.
+In no event shall QNeura.ai be liable for any damages (including, without limitation, damages for loss of data or profit, or due to business interruption) arising out of the use or inability to use the Service.
 
 ## 8. Changes to Terms
 
-[COMPANY_NAME] reserves the right, at its sole discretion, to modify or replace these Terms at any time. Continued use of the Service after changes constitutes acceptance of the updated terms.
+QNeura.ai reserves the right, at its sole discretion, to modify or replace these Terms at any time. Continued use of the Service after changes constitutes acceptance of the updated terms.
 
 ## 9. Contact Us
 
-If you have questions about these Terms, contact us at [CONTACT_EMAIL] or [CONTACT_URL].
+If you have questions about these Terms, contact us at solomon@qneura.ai or https://qneura.ai/apps.html.
 
 ## 10. External Content Sources
 
@@ -460,7 +504,7 @@ We may update this Privacy Policy from time to time. We will notify you of any c
 
 ## 9. Contact Us
 
-If you have any questions about this Privacy Policy, contact us at [CONTACT_EMAIL] or [CONTACT_URL].
+If you have any questions about this Privacy Policy, contact us at solomon@qneura.ai or https://qneura.ai/apps.html.
 ```
 
 ### Business Source License 1.1 (Template)
@@ -470,8 +514,8 @@ Business Source License 1.1
 
 Parameters
 Licensor: [COMPANY_NAME]
-Licensed Work: [APP_NAME]
-Additional Use Grant: [None or limited production use]
+Licensed Work: [APP_NAME] Source Code
+Additional Use Grant: [Production use allowed / see BINARY-LICENSE.txt for binary terms]
 Change Date: [YYYY-MM-DD]
 Change License: [GPL-2.0-or-later or compatible license]
 
@@ -541,6 +585,86 @@ other recipients of the licensed work to be provided by Licensor:
 3. To specify a Change Date.
 
 4. Not to modify this License in any other way.
+```
+
+### Binary Distribution License (Template)
+
+```text
+Binary Distribution License
+
+This Binary Distribution License ("License") governs use of the compiled
+binary distribution for [APP_NAME] (the "Binary"), including DMG, EXE, and
+app bundles.
+
+1. License Grant
+You may install and use the Binary for personal or internal business use.
+
+2. Restrictions
+You may not sell, rent, sublicense, or redistribute the Binary.
+You may not use the Binary for any commercial offering or for third-party
+hosting/managed service.
+
+3. Source Code
+Source code is licensed separately under the Business Source License 1.1.
+See [SOURCE_LICENSE_FILE] for details.
+
+4. No Warranty
+THE BINARY IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+IMPLIED, INCLUDING BUT NOT LIMITED TO WARRANTIES OF MERCHANTABILITY,
+FITNESS FOR A PARTICULAR PURPOSE, AND NON-INFRINGEMENT.
+
+5. Limitation of Liability
+IN NO EVENT SHALL [COMPANY_NAME] BE LIABLE FOR ANY CLAIM, DAMAGES, OR OTHER
+LIABILITY ARISING FROM THE USE OF THE BINARY.
+
+6. Contact
+If you need commercial binary distribution rights, contact [CONTACT_EMAIL].
+```
+
+### License Overview Page (Template)
+
+```markdown
+# Licensing Overview
+
+Last updated: [MONTH YYYY]
+
+## Summary
+[APP_NAME] is source-available under a BSL-style license. Source code use is
+allowed, while binary distribution has stricter terms.
+
+## Source Code License (BSL 1.1)
+- **License:** Business Source License 1.1
+- **Scope:** Source code only
+- **File:** `LICENSE`
+- **Notes:** [Short description of permitted use and change date]
+
+## Binary Distribution License
+- **License:** Binary Distribution License (EULA)
+- **Scope:** DMG/EXE/app bundles and any compiled binaries
+- **File:** `BINARY-LICENSE.txt`
+- **Key restriction:** No commercial use or redistribution of the Binary
+
+## What You Can Do
+- Clone and modify the source code
+- Build binaries for personal or internal use
+- Use the source code in production (as permitted by BSL parameters)
+
+## What You Cannot Do
+- Sell or redistribute the official binary distribution
+- Offer the binary as part of a commercial service without a license
+
+## Need Commercial Rights?
+Contact [CONTACT_EMAIL] for commercial binary licensing.
+```
+
+### README License Section (Template)
+
+```markdown
+## License
+
+- Source code: Business Source License 1.1 (`LICENSE`)
+- Binary distribution: Binary Distribution License (`BINARY-LICENSE.txt`)
+- Overview: `LICENSE.md`
 ```
 
 ## Report Format
@@ -644,6 +768,7 @@ After review, offer to fix issues:
 - No input validation on file paths
 - Missing About page or version display
 - No privacy policy in app
+- Missing `LICENSE` or `BINARY-LICENSE.txt`
 - Author not set to Qneura.ai
 - No accessibility testing done
 - No `bin/appctl` control script
