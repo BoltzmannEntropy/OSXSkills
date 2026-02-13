@@ -342,6 +342,15 @@ digraph review_flow {
 - [ ] Terms of Service includes binary distribution restrictions and link to `BINARY-LICENSE.txt`
 - [ ] Bundle both license files into the app (`Contents/Resources/`) and DMG root
 
+### Three-Surface License Completeness (Required)
+- [ ] Website licenses are written and published (not placeholders): `license.html` must clearly state source license and binary distribution license terms.
+- [ ] Website hero/meta references to licensing (`Open Source`, `License`) link to `license.html`.
+- [ ] Flutter macOS app licenses are written and visible: in-app Legal/License screen must include or link to source + binary terms.
+- [ ] Flutter macOS app bundle contains written license files: `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`.
+- [ ] Git repository licenses are written and versioned: root `LICENSE` + `BINARY-LICENSE.txt` + license overview doc (`LICENSE.md` or `docs/licensing.md`).
+- [ ] README top section and License section both link to the written repo license files and website license page.
+- [ ] Release is blocked if any one of the three surfaces (website, app, repo) is missing written license content.
+
 ### Cross-Repo Website + README Consistency (Mandatory)
 - [ ] Use this canonical sentence (copy exactly, replace app name only):
   - `License: Source code is licensed under Business Source License 1.1 (BSL-1.1), and binary distributions are licensed under the [APP_NAME] Binary Distribution License. See LICENSE, BINARY-LICENSE.txt, and the website License page.`
