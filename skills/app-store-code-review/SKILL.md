@@ -568,8 +568,19 @@ class MCPHandler(BaseHTTPRequestHandler):
 - [ ] Theme preference (Light/Dark/System)
 - [ ] Clear cache option
 - [ ] Reset to defaults option
+- [ ] Diagnostics section includes one-click `Export Diagnostic Logs` action from Settings (downloads a ZIP bundle from backend logs)
+- [ ] App includes a visible `Pro`/Licensing surface with `Buy License` CTA.
+- [ ] Default trial is 7 days and the UI shows live `days left` countdown (e.g., `You have X days left in your trial`).
+- [ ] Trial banner includes `Enter License` action and transitions to an activated/Pro state after successful key entry.
+- [ ] Pro screen includes editable Polar.sh URL fields for both checkout and customer portal.
+- [ ] Activation flow records licensing metadata (`license_provider=polar`, activation timestamp).
 - [ ] Backend connection status indicator
 - [ ] Model/engine management (if applicable)
+
+### Trial + Licensing Rationale (Required)
+- [ ] The app must surface trial state in-product so users understand remaining evaluation time without contacting support.
+- [ ] The app must expose explicit purchase and activation actions to avoid hidden conversion paths.
+- [ ] The app must support Polar.sh URL configuration without recompiling so checkout/portal links can be changed post-release.
 
 ### About Screen Standard (Mandatory)
 - [ ] Every app has a dedicated About screen/page reachable from primary navigation or Settings.
@@ -995,6 +1006,10 @@ After review, offer to fix issues:
 - No `bin/appctl` control script
 - No `install.sh` installer script
 - No `issues.sh` diagnostic script
+- No in-app `Export Diagnostic Logs` action in Settings
+- No visible Pro/Licensing UI with `Buy License` CTA
+- No trial-days-left banner/countdown (default 7-day trial not surfaced to user)
+- No Polar-ready licensing configuration (missing checkout/portal URL fields)
 - Using deprecated `withOpacity()` instead of `withValues(alpha:)`
 - No dark mode support
 - No MCP server for macOS app (missing `bin/*_mcp_server.py`)

@@ -503,6 +503,21 @@ Release is blocked when any of the following are missing or inconsistent:
 5. About screen mandatory sections are absent
 6. Flutter icons are default/reused across apps without approval
 
+### macOS Release UX Baseline (Mandatory)
+
+Rationale:
+- Support and QA need one-click diagnostics export to reproduce field failures quickly.
+- Licensing conversion drops when trial state is hidden or purchase/activation paths are unclear.
+- Polar.sh onboarding is faster when checkout and customer-portal URLs are configurable per app without code changes.
+
+Required implementation checks:
+- Settings includes a Diagnostics section with one-click `Export Diagnostic Logs` action.
+- Export action writes a ZIP bundle from backend/runtime logs to a user-selected path.
+- App has a visible `Pro`/Licensing UI with `Buy License`, `Enter License`, and activation feedback.
+- Default trial is 7 days and UI shows live `days left` countdown text.
+- Pro screen stores configurable Polar URLs (`checkout` + `portal`) and can open both.
+- Activation path records licensing provider metadata (`license_provider=polar`) and activation timestamp.
+
 ### Three-Surface License Completeness (Required)
 - Website licenses are written and published in `<AppName>WEB/license.html` (not placeholders) and clearly state source + binary terms
 - Website hero/meta references to licensing (`Open Source`, `License`) link to `<AppName>WEB/license.html`
@@ -723,6 +738,10 @@ The skill marks these as release-risk patterns:
 - No `bin/appctl` control script
 - No `install.sh` installer script
 - No `issues.sh` diagnostic script
+- No in-app `Export Diagnostic Logs` action in Settings
+- No visible Pro/Licensing UI with `Buy License` CTA
+- No trial-days-left banner/countdown (default 7-day trial not surfaced to user)
+- No Polar-ready licensing configuration (missing checkout/portal URL fields)
 - Using deprecated `withOpacity()` instead of `withValues(alpha:)`
 - No dark mode support
 - No MCP server for macOS app (missing `bin/*_mcp_server.py`)
