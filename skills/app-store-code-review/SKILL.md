@@ -577,6 +577,8 @@ class MCPHandler(BaseHTTPRequestHandler):
 - [ ] About screen includes **What This Project Does** with concrete bullets (not marketing-only text).
 - [ ] About screen includes **Model Credits & Licenses** section with model/library names and license labels.
 - [ ] About screen includes a **Legal** section with buttons/links to Privacy, Terms, and License surfaces.
+- [ ] In Flutter apps, About-screen Legal buttons route to in-app legal screens (Privacy / Terms / License), not directly to external website legal pages.
+- [ ] Brand footer text `Qneura.ai` is clickable and opens the official website (`https://qneura.ai` or `https://qneura.ai/apps.html`).
 - [ ] About screen footer includes ownership/copyright line and license summary.
 - [ ] Layout follows Librarius-style readable card stack (max-width constrained, high contrast, desktop-safe spacing).
 - [ ] Changes must be additive: preserve existing app-specific details and links while adding missing compliance sections.
