@@ -1,6 +1,6 @@
 # OSX Skills for Claude Code
 
-Production-ready macOS release skill focused on App Store and distribution readiness.
+Production-ready skills for verifying and shipping macOS applications with Claude Code.
 
 ## Overview
 
