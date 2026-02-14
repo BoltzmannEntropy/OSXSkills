@@ -571,6 +571,16 @@ class MCPHandler(BaseHTTPRequestHandler):
 - [ ] Backend connection status indicator
 - [ ] Model/engine management (if applicable)
 
+### About Screen Standard (Mandatory)
+- [ ] Every app has a dedicated About screen/page reachable from primary navigation or Settings.
+- [ ] About screen includes an **Important Notice** card (scope + non-advice disclaimer).
+- [ ] About screen includes **What This Project Does** with concrete bullets (not marketing-only text).
+- [ ] About screen includes **Model Credits & Licenses** section with model/library names and license labels.
+- [ ] About screen includes a **Legal** section with buttons/links to Privacy, Terms, and License surfaces.
+- [ ] About screen footer includes ownership/copyright line and license summary.
+- [ ] Layout follows Librarius-style readable card stack (max-width constrained, high contrast, desktop-safe spacing).
+- [ ] Changes must be additive: preserve existing app-specific details and links while adding missing compliance sections.
+
 ### Branding & Assets
 - [ ] App icon at all required sizes
 - [ ] Custom branded icon exists for this app (no reused template/stock icon from another app)
@@ -579,6 +589,17 @@ class MCPHandler(BaseHTTPRequestHandler):
 - [ ] Website favicon/icons are generated from the same canonical icon source to keep branding consistent
 - [ ] Consistent branding throughout app
 - [ ] Splash/launch screen matches branding
+
+### Flutter Icon Gate (Mandatory - Release Blocker)
+- [ ] Every Flutter app in scope has its own branded icon (subject-matched visual identity).
+- [ ] Reject release if app icon hash matches Flutter default icon assets.
+- [ ] Reject release if two different apps share the exact same icon hash unless explicitly approved by user.
+- [ ] Store/update canonical source as `<repo>/assets/app_icon_source.png` and regenerate icon set from it.
+- [ ] Regenerate macOS icon files:
+  - `<repo>/macos/Runner/Assets.xcassets/AppIcon.appiconset/app_icon_{16,32,64,128,256,512,1024}.png`
+- [ ] If app uses `flutter_app/`, apply the same rule under:
+  - `<repo>/flutter_app/macos/Runner/Assets.xcassets/AppIcon.appiconset/`
+- [ ] Do not leave placeholder text like `"A new Flutter project."` in release app metadata.
 
 ### App Store Metadata
 - [ ] App description written
