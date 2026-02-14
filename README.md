@@ -4,132 +4,224 @@ Production-ready skills for verifying and shipping macOS applications with Claud
 
 ## Overview
 
-This repository currently ships one skill:
+This repository currently ships one release skill:
 
 - `app-store-code-review`
 
-It is a systematic release-review framework for apps targeting Apple App Store, Google Play, and desktop distribution. The skill is designed to catch crash risks, security defects, compliance gaps, licensing inconsistencies, and release blockers before shipping.
+The skill is an operational review standard for apps targeting Apple App Store, Google Play, or desktop distribution. It is not a lightweight lint pass. It is a release gate focused on real failure modes: crashes, resource leaks, security defects, legal inconsistencies, platform non-compliance, and missing operational tooling.
 
-## Included Skill
+Primary source of truth: `skills/app-store-code-review/SKILL.md`
 
-### `app-store-code-review`
+## Rationale
 
-Use this skill when you are:
+Shipping desktop apps fails most often at integration boundaries, not in isolated feature code. This skill exists to prevent:
 
-- Preparing App Store or Play Store submissions
-- Preparing a production release
-- Performing final release QA
-- Reviewing Flutter, Swift, Kotlin, or Python backend stacks
-- Validating macOS app + website + repo legal consistency
+- App Store rejection from missing manifests, entitlements, legal pages, or metadata
+- Production incidents caused by lifecycle misuse (`setState` after dispose, leaked timers/subscriptions, force unwraps)
+- Security regressions (weak input validation, permissive CORS, secrets in source)
+- Distribution defects (unsigned/unnotarized DMGs, missing hashes, missing bundled license files)
+- Cross-repo drift between app code, website legal text, and README license language
+- AI-integration gaps where macOS apps ship without MCP parity and testable tool contracts
 
-Primary source: `skills/app-store-code-review/SKILL.md`
+## When to Use the Skill
 
-## What This Skill Enforces
+Use `app-store-code-review`:
 
-The skill requires a full pass across all categories below.
+- Before App Store or Play Store submission
+- Before any production release
+- After major feature milestones
+- When a request includes words like `ship`, `release`, `production`, `App Store`
+- For Flutter, Swift, Kotlin, React Native, and Python-backend app stacks
 
-1. Crash Prevention
-2. Resource Management
-3. Network and API Resilience
-4. Security
-5. Data Persistence
-6. Platform Compliance
-7. Error Handling
-8. MCP Tool Integration (macOS required)
-9. Performance
-10. Product Information and Legal Surfaces
+## Mandatory Workspace Layout
 
-It also applies release blockers for:
+For macOS app projects in this workspace, the skill enforces:
 
-- Missing or inconsistent source/binary license surfaces
-- Missing website GDPR consent popup (`privacy-consent.js`) on required pages
-- Missing MCP server/tooling for macOS app functionality
-- Missing About screen compliance sections
-- Reused/default Flutter icons or branding asset mismatches
+- `artifacts/code/<AppName>PRJ/<AppName>CODE` for source code
+- `artifacts/code/<AppName>PRJ/<AppName>WEB` for the static website
 
-## Mandatory Repository Layout (Workspace Convention)
-
-For macOS app projects reviewed with this skill:
-
-- `artifacts/code/<AppName>PRJ/<AppName>CODE` - source repository
-- `artifacts/code/<AppName>PRJ/<AppName>WEB` - app website repository
-
-Required legal surfaces:
+Legal/compliance review must cover three surfaces:
 
 - README surface: `<AppName>CODE/README.md`
 - Flutter app surface: `<AppName>CODE/flutter_app/`
 - Website surface: `<AppName>WEB/index.html`, `license.html`, `privacy.html`, `terms.html`, `privacy-consent.js`
 
-Do not place new app sites under `artifacts/all-web` for these macOS app projects.
+Do not use `artifacts/all-web` for these macOS app sites.
+
+## Review Flow
+
+The skill requires a full sequential pass across ten categories:
+
+1. Crash Prevention
+2. Resource Management
+3. Network and API
+4. Security
+5. Data Persistence
+6. Platform Compliance
+7. Error Handling
+8. MCP Integration (Required for macOS apps)
+9. Performance
+10. Product Information and Legal Completeness
+
+No category is optional in a release review.
 
 ## Severity Model
 
-- `Critical`: crash/data-loss/rejection risk; must fix before submission
-- `High`: likely user impact; should fix before submission
-- `Medium`: edge-case degradation; fix next release
-- `Low`: quality/best-practice improvements
+- `Critical`: crash, data loss, or rejection risk; must fix before submission
+- `High`: likely user-facing failure under normal use; should fix before submission
+- `Medium`: edge-case degradation; schedule for near-term release
+- `Low`: code quality and best-practice improvements
 
-## Review Output Format
+## Detailed Coverage
 
-The skill expects reports in this structure:
+### 1) Crash Prevention
 
-- Executive Summary with issue totals and release recommendation
-- Critical Issues (must fix)
-- High Issues
-- Medium Issues
-- Low Issues
-- Positive Observations
-- Prioritized Recommendations
+Checks include:
 
-## Key Release Gates Captured in the Skill
+- Flutter lifecycle safety (`mounted` checks, controller/subscription/timer disposal)
+- Null-safety and bounds-safe access patterns
+- Swift optional safety and retain-cycle prevention (`weak self`)
+- Kotlin lifecycle/nullability safety
+- Backend exception boundaries and thread safety
 
-### 1. License and Cross-Repo Consistency
+The skill also enforces modern Flutter UI hygiene used in production patterns:
 
-The skill requires source and binary licensing to be explicit and consistent across:
+- Material 3 via `ColorScheme.fromSeed()`
+- System dark mode support
+- Startup backend health handling
+- `withValues(alpha:)` instead of deprecated `withOpacity()`
 
-- Repo files (`LICENSE`, `BINARY-LICENSE.txt`, overview doc)
-- App UI legal screens
-- Website legal pages
-- README license references
+### 2) Resource Management
 
-It also enforces a canonical README licensing sentence pattern and a clear binary-availability statement.
+Checks include:
 
-### 2. Website Privacy Consent Popup
+- Memory leaks (listeners, media, background tasks, handles)
+- File system safety (existence, permissions, path sanitization, disk space)
+- Audio/video lifecycle cleanup
+- Voice-clone memory profiling and regression checks for long pipelines
 
-Every app site must implement Mimika-style consent behavior:
+### 3) Network and API Resilience
 
-- `Accept` and `Reject` actions
-- Decision persisted in `localStorage`
-- Links to the app's own `privacy.html` and `terms.html`
-- Tracking/analytics only after explicit acceptance
-- Loaded on `index.html`, `license.html`, `privacy.html`, and `terms.html`
+Checks include:
 
-### 3. MCP Integration for macOS Apps
+- Explicit request timeouts and timeout-specific UX
+- Graceful handling for 4xx/5xx/malformed/empty responses
+- Retry/backoff and cancellation on screen exit
+- Configurable endpoints and versioning
 
-macOS apps are expected to expose functionality through MCP tools with:
+### 4) Security
 
-- JSON-RPC methods (`initialize`, `tools/list`, `tools/call`)
-- Valid tool schemas (`name`, `description`, `inputSchema`)
-- HTTP API parity for all tool actions
-- Logging, configurability, and tests
+Checks include:
 
-### 4. Product and Legal Completeness
+- Input validation and path traversal prevention
+- Secure token storage and session handling
+- HTTPS and production CORS restrictions
+- No sensitive logging and no hardcoded secrets
+- At-rest protection for sensitive data
 
-The skill checks for:
+### 5) Data Persistence
 
-- Version/build visibility
-- About screen standards
-- Privacy, Terms, and License accessibility
-- Support/contact and accessibility readiness
-- Store metadata completeness
+Checks include:
 
-### 5. Branding and Icon Compliance
+- Migration strategy and corruption recovery
+- Thread-safe database access
+- Settings defaults and migration safety
+- Cache limits, expiration, and corruption handling
 
-The skill rejects release when apps reuse default Flutter icons or duplicate icon hashes across different apps without explicit approval.
+### 6) Platform Compliance
 
-## Built-In Templates in the Skill
+Checks include:
 
-`app-store-code-review` includes reusable templates for:
+- Apple: privacy manifest, ATS, entitlements, icon matrix, launch assets
+- Google Play: target SDK, permissions, data safety, 64-bit, App Bundle
+- macOS App Store: sandboxing, hardened runtime, notarization readiness
+- macOS direct distribution: DMG structure, signing, notarization, hash output, version extraction, license file embedding
+
+Project operations are also enforced:
+
+- `bin/appctl` for lifecycle management
+- `install.sh` for setup
+- `issues.sh` for diagnostics
+
+### 7) Error Handling
+
+Checks include:
+
+- Actionable user-facing error states and loading/empty states
+- Structured logging with no sensitive payload leakage
+- Recovery paths, retries, and state preservation
+
+### 8) MCP Integration (Mandatory for macOS Apps)
+
+The skill treats MCP as required app surface for Claude interoperability:
+
+- Server script with JSON-RPC 2.0 support
+- Required methods: `initialize`, `tools/list`, `tools/call`
+- Typed tool definitions (`name`, `description`, `inputSchema`)
+- Minimum tool families: health check, status/info, list resources, primary action
+- HTTP API parity with MCP actions
+- Tests for schema validity, dispatch, and protocol/error handling
+- Configurable host/port/backend URL and rotating logs
+
+### 9) Performance
+
+Checks include:
+
+- Startup latency and main-thread blocking avoidance
+- UI frame stability and background processing
+- Long-session memory stability
+- Battery behavior and polling discipline
+
+### 10) Product Information and Legal Completeness
+
+Checks include:
+
+- Centralized version/build surfaced in app UI
+- About screen with legal links, credits, license summary, ownership footer
+- Privacy/Terms/License pages accessible in app and website
+- Support/contact, accessibility, onboarding, and settings completeness
+- Branded icon assets with canonical source management
+- App Store metadata completeness
+
+## Mandatory Release Gates
+
+Release is blocked when any of the following are missing or inconsistent:
+
+1. Three-surface licensing is incomplete (website + app + repo)
+2. README and website license language diverge
+3. `privacy-consent.js` is missing or incomplete on required website pages
+4. macOS MCP server/tools/tests are missing for app functionality
+5. About screen mandatory sections are absent
+6. Flutter icons are default/reused across apps without approval
+
+## Cross-Repo License Consistency Rule
+
+The skill defines a canonical sentence for README/license consistency checks:
+
+```text
+License: Source code is licensed under Business Source License 1.1 (BSL-1.1), and binary distributions are licensed under the [APP_NAME] Binary Distribution License. See LICENSE, BINARY-LICENSE.txt, and the website License page.
+```
+
+It also requires explicit binary-availability wording:
+
+```text
+The codebase is cross-platform, but we currently provide macOS binaries only.
+```
+
+## Website Privacy Consent Requirements
+
+Each app website must provide Mimika-style GDPR consent behavior:
+
+- Script file: `<AppName>WEB/privacy-consent.js`
+- Loaded on `index.html`, `license.html`, `privacy.html`, `terms.html`
+- Both `Accept` and `Reject` actions
+- Decision persisted with app-specific `localStorage` keys
+- Links to that app's `privacy.html` and `terms.html`
+- Analytics/tracking initialized only after explicit accept
+
+## Built-In Legal Templates
+
+`app-store-code-review` includes practical templates for:
 
 - Terms of Service
 - Privacy Policy
@@ -138,11 +230,41 @@ The skill rejects release when apps reuse default Flutter icons or duplicate ico
 - License Overview page
 - README License section
 
-These templates are defined directly in `skills/app-store-code-review/SKILL.md`.
+Use them as starter text and parameterize placeholders for each app release.
+
+## Report Format Required by the Skill
+
+The expected report structure is:
+
+- Executive Summary with issue totals by severity
+- Critical Issues
+- High Issues
+- Medium Issues
+- Low Issues
+- Positive Observations
+- Prioritized Recommendations
+
+Each finding should include file path, severity, issue description, and recommended fix.
+
+## Red Flags (Immediate Attention)
+
+The skill marks these as release-risk patterns:
+
+- Hardcoded `localhost`/`127.0.0.1` where not intended
+- Open CORS (`allow_origins=["*"]`) in production
+- Bare `except:` / swallowed exceptions
+- Missing network timeouts
+- Async UI updates without lifecycle guards
+- Missing privacy policy or legal pages
+- Missing `LICENSE` and `BINARY-LICENSE.txt`
+- Missing or non-functional GDPR popup on website pages
+- Missing MCP server/tool schemas/tests for macOS apps
+- Deprecated Flutter API usage (`withOpacity()`)
+- Missing dark mode support
 
 ## Installation
 
-Install into Claude Code skills directory:
+Install skills into Claude Code:
 
 ```bash
 cp -r skills/* ~/.claude/skills/
@@ -150,13 +272,11 @@ cp -r skills/* ~/.claude/skills/
 
 ## Usage
 
-Invoke directly in Claude Code:
-
 ```text
 /app-store-code-review
 ```
 
-Typical post-review follow-ups:
+Typical follow-up commands after a report:
 
 1. Fix all Critical issues
 2. Fix Critical + High issues
@@ -165,7 +285,7 @@ Typical post-review follow-ups:
 ## References
 
 - Skill definition: `skills/app-store-code-review/SKILL.md`
-- License: `LICENSE`
+- Repository license: `LICENSE`
 
 ## Author
 
