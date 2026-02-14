@@ -1,124 +1,172 @@
 # OSX Skills for Claude Code
 
-Production-ready skills for building and shipping macOS applications with Claude Code.
+Production-ready macOS release skill focused on App Store and distribution readiness.
 
 ## Overview
 
-These skills were developed by [Qneura.ai](https://qneura.ai) to systematically build, review, and ship desktop applications for macOS. They encode hard-won lessons from shipping real apps to the App Store and direct distribution.
+This repository currently ships one skill:
 
-**See our apps in action:** [https://qneura.ai/apps.html](https://qneura.ai/apps.html)
+- `app-store-code-review`
 
-## Skills Included
+It is a systematic release-review framework for apps targeting Apple App Store, Google Play, and desktop distribution. The skill is designed to catch crash risks, security defects, compliance gaps, licensing inconsistencies, and release blockers before shipping.
 
-### 1. `app-store-code-review`
+## Included Skill
 
-A comprehensive code review checklist for preparing apps for App Store submission or direct distribution.
+### `app-store-code-review`
 
-**Covers:**
-- Crash prevention (lifecycle, memory, async safety)
-- Resource management (memory leaks, file handling)
-- Network & API resilience
-- Security (input validation, auth, data protection)
-- Platform compliance (Apple App Store, macOS)
-- Product information (About page, version, legal pages)
-- Project infrastructure (control scripts, installers, DMG builders)
+Use this skill when you are:
 
-### 2. `flutter-python-fullstack`
+- Preparing App Store or Play Store submissions
+- Preparing a production release
+- Performing final release QA
+- Reviewing Flutter, Swift, Kotlin, or Python backend stacks
+- Validating macOS app + website + repo legal consistency
 
-A complete pattern for building desktop applications with Flutter frontend and Python FastAPI backend.
+Primary source: `skills/app-store-code-review/SKILL.md`
 
-**Covers:**
-- Project structure and organization
-- Flutter UI patterns (Material 3, dark mode, tabs)
-- Backend API patterns
-- Control scripts (`bin/appctl`)
-- Installation and diagnostic scripts
-- DMG build pipeline
-- Licensing integration (Polar)
+## What This Skill Enforces
 
-## Rationale
+The skill requires a full pass across all categories below.
 
-### Why Skills?
+1. Crash Prevention
+2. Resource Management
+3. Network and API Resilience
+4. Security
+5. Data Persistence
+6. Platform Compliance
+7. Error Handling
+8. MCP Tool Integration (macOS required)
+9. Performance
+10. Product Information and Legal Surfaces
 
-Building production-quality macOS apps involves hundreds of decisions and checklist items. Without systematic documentation:
+It also applies release blockers for:
 
-1. **Knowledge gets lost** - Each project re-learns the same lessons
-2. **Quality varies** - Different developers make different choices
-3. **Shipping delays** - App Store rejections from missed requirements
-4. **User complaints** - Crashes and bugs from incomplete testing
+- Missing or inconsistent source/binary license surfaces
+- Missing website GDPR consent popup (`privacy-consent.js`) on required pages
+- Missing MCP server/tooling for macOS app functionality
+- Missing About screen compliance sections
+- Reused/default Flutter icons or branding asset mismatches
 
-Skills encode this knowledge in a format that Claude Code can use consistently across projects.
+## Mandatory Repository Layout (Workspace Convention)
 
-### Why These Specific Skills?
+For macOS app projects reviewed with this skill:
 
-**app-store-code-review** emerged from repeated App Store rejections and crash reports. Every checklist item represents a real bug or rejection we experienced.
+- `artifacts/code/<AppName>PRJ/<AppName>CODE` - source repository
+- `artifacts/code/<AppName>PRJ/<AppName>WEB` - app website repository
 
-**flutter-python-fullstack** emerged from building multiple apps with the same architecture. The patterns are battle-tested across production deployments.
+Required legal surfaces:
 
-### Design Principles
+- README surface: `<AppName>CODE/README.md`
+- Flutter app surface: `<AppName>CODE/flutter_app/`
+- Website surface: `<AppName>WEB/index.html`, `license.html`, `privacy.html`, `terms.html`, `privacy-consent.js`
 
-1. **Actionable checklists** - Not philosophy, but concrete items to verify
-2. **Code examples** - Copy-paste ready patterns
-3. **Common issues tables** - Quick fixes for frequent problems
-4. **Red flags** - Immediate attention items
-5. **Reference to real implementations** - Patterns from shipping apps
+Do not place new app sites under `artifacts/all-web` for these macOS app projects.
 
-## Example: MimikaStudio
+## Severity Model
 
-MimikaStudio is a local-first voice cloning and TTS application built using these skills.
+- `Critical`: crash/data-loss/rejection risk; must fix before submission
+- `High`: likely user impact; should fix before submission
+- `Medium`: edge-case degradation; fix next release
+- `Low`: quality/best-practice improvements
 
-![MimikaStudio Screenshot](images/mimikastudio-example.png)
+## Review Output Format
 
-**Key features demonstrated:**
-- Flutter Material 3 UI with dark mode support
-- Python FastAPI backend with multiple TTS engines
-- About page with version, author (Qneura.ai), and credits
-- DMG distribution with code signing
-- Control scripts for easy development
+The skill expects reports in this structure:
+
+- Executive Summary with issue totals and release recommendation
+- Critical Issues (must fix)
+- High Issues
+- Medium Issues
+- Low Issues
+- Positive Observations
+- Prioritized Recommendations
+
+## Key Release Gates Captured in the Skill
+
+### 1. License and Cross-Repo Consistency
+
+The skill requires source and binary licensing to be explicit and consistent across:
+
+- Repo files (`LICENSE`, `BINARY-LICENSE.txt`, overview doc)
+- App UI legal screens
+- Website legal pages
+- README license references
+
+It also enforces a canonical README licensing sentence pattern and a clear binary-availability statement.
+
+### 2. Website Privacy Consent Popup
+
+Every app site must implement Mimika-style consent behavior:
+
+- `Accept` and `Reject` actions
+- Decision persisted in `localStorage`
+- Links to the app's own `privacy.html` and `terms.html`
+- Tracking/analytics only after explicit acceptance
+- Loaded on `index.html`, `license.html`, `privacy.html`, and `terms.html`
+
+### 3. MCP Integration for macOS Apps
+
+macOS apps are expected to expose functionality through MCP tools with:
+
+- JSON-RPC methods (`initialize`, `tools/list`, `tools/call`)
+- Valid tool schemas (`name`, `description`, `inputSchema`)
+- HTTP API parity for all tool actions
+- Logging, configurability, and tests
+
+### 4. Product and Legal Completeness
+
+The skill checks for:
+
+- Version/build visibility
+- About screen standards
+- Privacy, Terms, and License accessibility
+- Support/contact and accessibility readiness
+- Store metadata completeness
+
+### 5. Branding and Icon Compliance
+
+The skill rejects release when apps reuse default Flutter icons or duplicate icon hashes across different apps without explicit approval.
+
+## Built-In Templates in the Skill
+
+`app-store-code-review` includes reusable templates for:
+
+- Terms of Service
+- Privacy Policy
+- Business Source License 1.1
+- Binary Distribution License
+- License Overview page
+- README License section
+
+These templates are defined directly in `skills/app-store-code-review/SKILL.md`.
 
 ## Installation
 
-Copy the skills to your Claude Code skills directory:
+Install into Claude Code skills directory:
 
 ```bash
-# For Claude Code
 cp -r skills/* ~/.claude/skills/
 ```
 
 ## Usage
 
-Once installed, Claude Code will automatically suggest these skills when relevant:
+Invoke directly in Claude Code:
 
-- Starting a new macOS app project: `flutter-python-fullstack`
-- Preparing for App Store submission: `app-store-code-review`
-- Reviewing code quality before release: `app-store-code-review`
-
-You can also invoke them directly:
-
-```
+```text
 /app-store-code-review
-/flutter-python-fullstack
 ```
 
-## Requirements
+Typical post-review follow-ups:
 
-- Claude Code CLI
-- Flutter SDK (for flutter-python-fullstack)
-- Python 3.11+ (for flutter-python-fullstack)
-- Xcode and macOS development tools
+1. Fix all Critical issues
+2. Fix Critical + High issues
+3. Generate a fix plan
 
-## Contributing
+## References
 
-These skills are actively maintained. If you find issues or have improvements:
-
-1. Fork this repository
-2. Make your changes
-3. Submit a pull request
-
-## License
-
-MIT License - See LICENSE file for details.
+- Skill definition: `skills/app-store-code-review/SKILL.md`
+- License: `LICENSE`
 
 ## Author
 
-[Qneura.ai](https://qneura.ai) - Building intelligent applications for macOS.
+[Qneura.ai](https://qneura.ai)
