@@ -785,3 +785,9 @@ Typical follow-up commands after a report:
 ## Author
 
 [Qneura.ai](https://qneura.ai)
+
+## Stars
+
+[![GitHub Stars](https://img.shields.io/github/stars/BoltzmannEntropy/OSXSkills?style=social)](https://github.com/BoltzmannEntropy/OSXSkills/stargazers)
+
+[![Star History Chart](https://api.star-history.com/svg?repos=BoltzmannEntropy/OSXSkills&type=Date)](https://star-history.com/#BoltzmannEntropy/OSXSkills&Date)
