@@ -570,17 +570,20 @@ class MCPHandler(BaseHTTPRequestHandler):
 - [ ] Reset to defaults option
 - [ ] Diagnostics section includes one-click `Export Diagnostic Logs` action from Settings (downloads a ZIP bundle from backend logs)
 - [ ] App includes a visible `Pro`/Licensing surface with `Buy License` CTA.
-- [ ] Default trial is 7 days and the UI shows live `days left` countdown (e.g., `You have X days left in your trial`).
+- [ ] Default trial is 7 days and the UI shows live `days left` countdown (e.g., `You have X days left in your trial`) for paid apps.
 - [ ] Trial banner includes `Enter License` action and transitions to an activated/Pro state after successful key entry.
-- [ ] Pro screen includes editable Polar.sh URL fields for both checkout and customer portal.
-- [ ] Activation flow records licensing metadata (`license_provider=polar`, activation timestamp).
+- [ ] Pro screen includes editable checkout + customer portal URL fields for both `Polar.sh` and `LemonSqueezy`.
+- [ ] Pro screen supports buying licenses from either provider directly in-app (`Buy with Polar`, `Buy with LemonSqueezy` or equivalent).
+- [ ] Activation flow records licensing metadata (`license_provider=polar|lemonsqueezy`, activation timestamp).
 - [ ] Backend connection status indicator
 - [ ] Model/engine management (if applicable)
 
 ### Trial + Licensing Rationale (Required)
 - [ ] The app must surface trial state in-product so users understand remaining evaluation time without contacting support.
 - [ ] The app must expose explicit purchase and activation actions to avoid hidden conversion paths.
-- [ ] The app must support Polar.sh URL configuration without recompiling so checkout/portal links can be changed post-release.
+- [ ] The app must support both Polar.sh and LemonSqueezy URL configuration without recompiling so checkout/portal links can be changed post-release.
+- [ ] Website and app must both offer purchase paths for paid apps to minimize checkout friction.
+- [ ] Free apps (for example Zephaniah) must explicitly disable trial-expiry and paid-license gating.
 
 ### About Screen Standard (Mandatory)
 - [ ] Every app has a dedicated About screen/page reachable from primary navigation or Settings.
