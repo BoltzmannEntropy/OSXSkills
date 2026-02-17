@@ -90,6 +90,11 @@ digraph review_flow {
 - [ ] **Status chips**: Color-coded (green/orange/red) using `withValues(alpha:)`
 - [ ] **Deprecated APIs**: No `withOpacity()` (use `withValues(alpha:)` instead)
 - [ ] **ApiService**: Centralized HTTP client with typed endpoints
+- [ ] **System log visibility**: App exposes a user-visible system log panel (not only startup status text)
+- [ ] **System log actions**: Users can copy logs and export logs directly from UI controls
+- [ ] **Footer log console**: App includes a footer system-log area that is collapsible and resizable
+- [ ] **Footer parity**: Footer log area also provides copy/export actions without navigating to settings
+- [ ] **Log export surface**: Backend provides a plain-text system log export endpoint (separate from full diagnostics bundle)
 
 ### iOS/Swift
 - [ ] No force unwraps (`!`) on optionals from external data
