@@ -83,6 +83,9 @@ digraph review_flow {
 - [ ] **Theme**: Uses `ColorScheme.fromSeed()` with Material 3
 - [ ] **Dark mode**: Supports `ThemeMode.system` (respects OS preference)
 - [ ] **Backend check**: Health check on startup with loading/disconnected states
+- [ ] **Bundled backend autostart**: If backend is down and app is bundled, UI attempts backend startup automatically (no manual CLI prerequisite for end users)
+- [ ] **Startup status UX**: UI shows backend startup progress/status (for example: starting/waiting/failed)
+- [ ] **Production messaging**: Disconnected-state copy does not instruct end users to run terminal commands
 - [ ] **Stats polling**: Uses `Future.doWhile()` with `mounted` guard
 - [ ] **Status chips**: Color-coded (green/orange/red) using `withValues(alpha:)`
 - [ ] **Deprecated APIs**: No `withOpacity()` (use `withValues(alpha:)` instead)
@@ -123,6 +126,8 @@ digraph review_flow {
 - [ ] File permissions checked
 - [ ] Path sanitization (no `../` injection)
 - [ ] Disk space checked before large writes
+- [ ] Runtime writes never target `.app/Contents/...` or mounted `.dmg` paths
+- [ ] Mutable runtime storage uses user-writable locations (`~/Library/Application Support/<App>`, `~/Library/Caches/<App>`, `~/Library/Logs/<App>`)
 
 ### Audio/Video
 - [ ] Players disposed when done
@@ -154,6 +159,8 @@ digraph review_flow {
 - [ ] Base URL configurable (not hardcoded localhost)
 - [ ] API version handling
 - [ ] Certificate pinning (if required)
+- [ ] Bundled desktop apps can fully start backend without any external shell command
+- [ ] Port-conflict path handled (if port already bound, user gets clear action instead of silent failure)
 
 ## 4. Security Checklist
 
@@ -190,6 +197,7 @@ digraph review_flow {
 - [ ] Thread-safe access (locking or connection per thread)
 - [ ] Backup/restore capability
 - [ ] Corruption recovery
+- [ ] Database path resolves to user-writable runtime directory (not app bundle path)
 
 ### Preferences/Settings
 - [ ] Default values for all settings
@@ -201,6 +209,8 @@ digraph review_flow {
 - [ ] Cache expiration
 - [ ] Cache invalidation logic
 - [ ] Graceful handling of corrupted cache
+- [ ] ML/model cache path is app-scoped for bundled builds (avoid accidental reuse of developer/global cache unless explicitly intended)
+- [ ] Model-download detection logic honors runtime cache environment variables (`HUGGINGFACE_HUB_CACHE` / `HF_HOME` / `XDG_CACHE_HOME`)
 
 ## 6. Platform Compliance Checklist
 
@@ -229,6 +239,7 @@ digraph review_flow {
 ### macOS Distribution
 - [ ] DMG builder script present (`scripts/build_dmg.sh`)
 - [ ] DMG includes app bundle, Applications symlink, and background image
+- [ ] `hdiutil` fallback packages the DMG staging directory (not only the `.app`) so Applications symlink survives fallback builds
 - [ ] Code signing for DMG distribution
 - [ ] Notarization of DMG for Gatekeeper
 - [ ] Volume name and window layout configured
@@ -237,6 +248,16 @@ digraph review_flow {
 - [ ] DMG root includes `LICENSE` (source) and `BINARY-LICENSE.txt` (binary/EULA)
 - [ ] App bundle embeds `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`
 - [ ] DMG license agreement configured (when supported by the DMG toolchain)
+
+### Bundled Python Backend (Mandatory for macOS Desktop Distribution)
+- [ ] Backend process is launched by the app itself on first run (no terminal dependency for end users)
+- [ ] Launch uses bundled Python runtime, not system Python
+- [ ] Backend startup path works when app is run from `/Applications` and does not rely on source checkout paths
+- [ ] Backend runtime env config sets app-specific writable paths for logs/data/outputs/cache
+- [ ] Backend does not require writing launcher logs into app bundle directories
+- [ ] Backend model/cache env vars are set for app-scoped storage (`HF_HOME`, `HUGGINGFACE_HUB_CACHE`, `TRANSFORMERS_CACHE`)
+- [ ] Backend health check retries include clear startup status and failure state
+- [ ] First-run behavior tested with no existing localhost backend process running
 
 ### Project Scripts (Reference: flutter-python-fullstack pattern)
 - [ ] **Control script** (`bin/appctl`):
@@ -417,6 +438,240 @@ class MCPHandler(BaseHTTPRequestHandler):
 }
 ```
 
+### MCP UI Screen (Required for macOS Apps with MCP)
+Every macOS app with MCP integration MUST include a dedicated MCP management screen accessible from Settings or main navigation.
+
+#### MCP Screen Structure
+- [ ] MCP screen exists at `lib/pages/mcp_page.dart` or `lib/screens/mcp_screen.dart`
+- [ ] MCP screen accessible from Settings page or main navigation sidebar
+- [ ] MCP screen header shows "MCP Integration" or "Claude Integration" title
+
+#### MCP Server Status Section
+- [ ] Server status indicator (Running/Stopped/Error) with color-coded chip
+- [ ] Server host and port display (e.g., `127.0.0.1:8087`)
+- [ ] Start/Stop server toggle or buttons
+- [ ] Server uptime display (optional)
+- [ ] Last activity timestamp (optional)
+
+#### Available Tools Section
+- [ ] List of all MCP tools with names and descriptions
+- [ ] Tool count badge (e.g., "10 tools available")
+- [ ] Expandable tool cards showing:
+  - Tool name (e.g., `quantum_run_benchmark`)
+  - Tool description
+  - Input parameters (from inputSchema)
+  - Required vs optional parameters indicator
+- [ ] Tool category grouping (optional, e.g., "System", "Benchmarks", "Queue")
+
+#### Configuration Section
+- [ ] Backend URL field (editable, defaults to environment variable)
+- [ ] MCP server port field (editable)
+- [ ] Auto-start MCP server toggle
+- [ ] Connection test button with success/failure feedback
+
+#### Claude Code Setup Section
+- [ ] Copy-to-clipboard button for Claude Code MCP configuration JSON
+- [ ] Pre-filled configuration template with correct paths
+- [ ] Instructions for adding to Claude Code settings
+- [ ] Link to Claude Code MCP documentation (if available)
+
+#### MCP Logs Section (Optional but Recommended)
+- [ ] Recent MCP server log entries (last 20-50 lines)
+- [ ] Log level filter (Debug/Info/Warning/Error)
+- [ ] Clear logs button
+- [ ] Export logs button
+
+#### MCP Screen Pattern (Reference Implementation)
+```dart
+// lib/pages/mcp_page.dart
+class McpPage extends StatefulWidget {
+  const McpPage({super.key});
+  @override
+  State<McpPage> createState() => _McpPageState();
+}
+
+class _McpPageState extends State<McpPage> {
+  bool _serverRunning = false;
+  List<Map<String, dynamic>> _tools = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadMcpStatus();
+    _loadTools();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return SingleChildScrollView(
+      padding: const EdgeInsets.all(24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // Header
+          _buildHeader(),
+          const SizedBox(height: 24),
+
+          // Server Status Card
+          _buildServerStatusCard(),
+          const SizedBox(height: 24),
+
+          // Available Tools Card
+          _buildToolsCard(),
+          const SizedBox(height: 24),
+
+          // Configuration Card
+          _buildConfigCard(),
+          const SizedBox(height: 24),
+
+          // Claude Code Setup Card
+          _buildClaudeCodeSetupCard(),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildServerStatusCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.dns, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('MCP Server Status', style: TextStyle(fontWeight: FontWeight.bold)),
+                const Spacer(),
+                Chip(
+                  label: Text(_serverRunning ? 'Running' : 'Stopped'),
+                  backgroundColor: _serverRunning ? Colors.green.shade100 : Colors.grey.shade200,
+                  labelStyle: TextStyle(color: _serverRunning ? Colors.green.shade800 : Colors.grey.shade700),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text('Host: 127.0.0.1:8087'),
+            const SizedBox(height: 8),
+            Row(
+              children: [
+                FilledButton.icon(
+                  onPressed: _toggleServer,
+                  icon: Icon(_serverRunning ? Icons.stop : Icons.play_arrow),
+                  label: Text(_serverRunning ? 'Stop Server' : 'Start Server'),
+                ),
+                const SizedBox(width: 8),
+                OutlinedButton.icon(
+                  onPressed: _testConnection,
+                  icon: const Icon(Icons.refresh),
+                  label: const Text('Test Connection'),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildToolsCard() {
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.build, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Available Tools', style: TextStyle(fontWeight: FontWeight.bold)),
+                const SizedBox(width: 8),
+                Chip(label: Text('${_tools.length} tools')),
+              ],
+            ),
+            const SizedBox(height: 16),
+            ..._tools.map((tool) => ExpansionTile(
+              title: Text(tool['name']),
+              subtitle: Text(tool['description'], maxLines: 1, overflow: TextOverflow.ellipsis),
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text('Parameters:', style: TextStyle(fontWeight: FontWeight.bold)),
+                      // Show inputSchema properties
+                    ],
+                  ),
+                ),
+              ],
+            )),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildClaudeCodeSetupCard() {
+    final config = '''
+{
+  "mcpServers": {
+    "appname": {
+      "command": "python3",
+      "args": ["/path/to/bin/appname_mcp_server.py"],
+      "env": {
+        "APPNAME_BACKEND_URL": "http://localhost:8000"
+      }
+    }
+  }
+}''';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(16),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.terminal, color: Theme.of(context).colorScheme.primary),
+                const SizedBox(width: 12),
+                const Text('Claude Code Setup', style: TextStyle(fontWeight: FontWeight.bold)),
+              ],
+            ),
+            const SizedBox(height: 16),
+            const Text('Add this configuration to your Claude Code settings:'),
+            const SizedBox(height: 12),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: Colors.grey.shade100,
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: SelectableText(config, style: const TextStyle(fontFamily: 'monospace', fontSize: 12)),
+            ),
+            const SizedBox(height: 12),
+            FilledButton.icon(
+              onPressed: () => Clipboard.setData(ClipboardData(text: config)),
+              icon: const Icon(Icons.copy),
+              label: const Text('Copy Configuration'),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+```
+
+#### MCP UI Accessibility
+- [ ] All MCP tool names readable by screen readers
+- [ ] Status indicators have text alternatives (not color-only)
+- [ ] Copy buttons have clear labels
+- [ ] Expandable sections properly announce state
+
 ### Common MCP Integration Issues
 | Issue | Pattern | Fix |
 |-------|---------|-----|
@@ -562,6 +817,18 @@ class MCPHandler(BaseHTTPRequestHandler):
 - [ ] Update notification mechanism (in-app or store redirect)
 - [ ] Data export capability (GDPR compliance)
 - [ ] Account deletion option (if applicable)
+
+## 11. First-Run Distribution Smoke Test (Mandatory for DMG Apps)
+
+- [ ] Open the built DMG and verify both app icon and `Applications` drag target are visible
+- [ ] Copy app to `/Applications` and launch from there (do not validate only from mounted DMG)
+- [ ] Verify app starts its bundled backend automatically on first launch
+- [ ] Verify no UI instruction requires running shell commands for normal users
+- [ ] Verify backend writes logs/data/cache to user-writable runtime locations
+- [ ] Verify first-run model status is clean for a fresh macOS user profile
+- [ ] Verify model download/delete works and persists across relaunch
+- [ ] Verify behavior when another process is already listening on backend port
+- [ ] Repeat smoke test on a fresh account or clean-home environment before release tag
 
 ### Settings Screen
 - [ ] Output folder selection (with folder picker)
@@ -979,6 +1246,10 @@ Generate report with this structure:
 | HTTP/MCP mismatch | Tools don't match API | Ensure 1:1 parity between MCP tools and HTTP endpoints |
 | No logging | Silent MCP failures | Add rotating file handler to `runs/logs/` |
 | Port conflicts | Multiple apps clash | Make `--host`/`--port` configurable |
+| No MCP UI screen | Users can't manage MCP | Add `lib/pages/mcp_page.dart` |
+| No tool discovery UI | Users can't see available tools | Add expandable tool list in MCP screen |
+| No Claude Code setup helper | Complex manual config | Add copy-to-clipboard config generator |
+| No MCP server status | Users can't verify MCP | Add status indicator with start/stop controls |
 
 ## Quick Commands
 
@@ -1006,6 +1277,11 @@ After review, offer to fix issues:
 - Missing GDPR popup script (`privacy-consent.js`) on any app website page
 - Author not set to Qneura.ai
 - No accessibility testing done
+- Bundled app does not auto-start backend, or UI tells users to run terminal commands
+- Runtime writes/logs/database under `.app/Contents` or mounted `.dmg`
+- DMG built via fallback path but missing `Applications` drag target
+- `hdiutil` fallback packages only `.app` instead of DMG staging folder
+- Model cache hardcoded to global `~/.cache/huggingface/hub` in bundled build without app-scoped override
 - No `bin/appctl` control script
 - No `install.sh` installer script
 - No `issues.sh` diagnostic script
@@ -1019,3 +1295,7 @@ After review, offer to fix issues:
 - MCP tools missing inputSchema or description
 - No HTTP API parity with MCP tools
 - MCP server not configurable (hardcoded ports/URLs)
+- No MCP UI screen in Flutter app (missing `lib/pages/mcp_page.dart`)
+- MCP UI missing tool discovery/list
+- MCP UI missing Claude Code configuration helper
+- MCP UI missing server status/controls
