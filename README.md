@@ -4,7 +4,7 @@ Production-ready skills for verifying and shipping macOS applications with Claud
 
 ## Overview
 
-This repository ships two release skills:
+This repository ships three skills for macOS app development:
 
 ### 1. `osx-app-compliance-check`
 
@@ -28,9 +28,34 @@ Primary source of truth: `skills/osx-app-compliance-check/SKILL.md`
 
 Primary source of truth: `skills/app-store-code-review/SKILL.md`
 
+### 3. `native-ai-model-selection`
+
+**AI model selection guide** for choosing native (non-Python) AI models for macOS apps. Covers ONNX, CoreML, MLX, and Metal frameworks for TTS, STT, semantic search, RAG, captioning, and more.
+
+- Framework comparison (MLX vs CoreML vs ONNX)
+- Model recommendations by use case
+- Integration patterns and code examples
+- Quantization guidelines
+- Bundling strategies (embedded vs on-demand download)
+- Performance optimization tips
+
+**Use when:** Adding AI features to macOS apps, choosing between frameworks, migrating from Python ML to native execution.
+
+Primary source of truth: `skills/native-ai-model-selection/SKILL.md`
+
 ## Skill Relationship
 
 ```
+native-ai-model-selection
+        |
+        v
+   AI Features
+   - TTS/STT models
+   - Embeddings
+   - RAG pipeline
+   - Vision models
+        |
+        v
 osx-app-compliance-check          app-store-code-review
         |                                  |
         v                                  v
@@ -44,7 +69,9 @@ osx-app-compliance-check          app-store-code-review
         +-----------> RELEASE <------------+
 ```
 
-Run `osx-app-compliance-check` first to ensure infrastructure is in place, then run `app-store-code-review` for code quality verification.
+1. Use `native-ai-model-selection` when adding AI features to choose the right models and frameworks
+2. Run `osx-app-compliance-check` to ensure infrastructure is in place
+3. Run `app-store-code-review` for code quality verification before release
 
 ## Rationale
 
