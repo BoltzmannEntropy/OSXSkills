@@ -309,7 +309,7 @@ Every macOS app MUST have a `scripts/release.sh` that automates the full release
 - [ ] MINOR version for new features (1.0.0 → 1.1.0)
 - [ ] MAJOR version for breaking changes (1.0.0 → 2.0.0)
 
-#### Release Script Pattern (Reference: Mayari/Zephaniah)
+#### Release Script Pattern
 ```bash
 #!/usr/bin/env bash
 # scripts/release.sh - Full Release Script
@@ -433,7 +433,7 @@ macOS apps MUST expose full functionality via MCP (Model Context Protocol) tools
 - [ ] `<domain>_list_*` - List available resources (voices, models, files, etc.)
 - [ ] `<domain>_<primary_action>` - Core functionality (generate, process, create)
 
-### MCP Tool Schema Pattern (Reference: MimikaStudio)
+### MCP Tool Schema Pattern
 ```python
 MCP_TOOLS = [
     {
@@ -821,7 +821,7 @@ class _McpPageState extends State<McpPage> {
   ```
 - [ ] About page present and accessible from main navigation
 
-### About Page Contents (Reference: MimikaStudio pattern)
+### About Page Contents
 - [ ] App logo/icon prominently displayed
 - [ ] App name as headline
 - [ ] Version number from centralized version file (e.g., `version.dart`)
@@ -882,7 +882,7 @@ class _McpPageState extends State<McpPage> {
 - [ ] In multi-repo updates, stage and commit only intended files from `<AppName>CODE` and `<AppName>WEB` when worktrees are already dirty.
 
 ### Website Privacy Consent Popup (Mandatory Across All App Sites)
-- [ ] Every app website in `<AppName>WEB` includes a Mimika-style GDPR consent popup script at `<AppName>WEB/privacy-consent.js`.
+- [ ] Every app website in `<AppName>WEB` includes a GDPR consent popup script at `<AppName>WEB/privacy-consent.js`.
 - [ ] `privacy-consent.js` is loaded on all public pages (minimum): `index.html`, `license.html`, `privacy.html`, `terms.html`.
 - [ ] Popup provides **both** actions: `Accept` and `Reject` (no single-button consent).
 - [ ] Consent is persisted in `localStorage` with app-specific keys (do not reuse another app's key names).
@@ -951,7 +951,7 @@ class _McpPageState extends State<McpPage> {
 - [ ] The app must expose explicit purchase and activation actions to avoid hidden conversion paths.
 - [ ] The app must support both Polar.sh and LemonSqueezy URL configuration without recompiling so checkout/portal links can be changed post-release.
 - [ ] Website and app must both offer purchase paths for paid apps to minimize checkout friction.
-- [ ] Free apps (for example Zephaniah) must explicitly disable trial-expiry and paid-license gating.
+- [ ] Free apps must explicitly disable trial-expiry and paid-license gating.
 
 ### About Screen Standard (Mandatory)
 - [ ] Every app has a dedicated About screen/page reachable from primary navigation or Settings.
@@ -962,7 +962,7 @@ class _McpPageState extends State<McpPage> {
 - [ ] In Flutter apps, About-screen Legal buttons route to in-app legal screens (Privacy / Terms / License), not directly to external website legal pages.
 - [ ] Brand footer text `Qneura.ai` is clickable and opens the official website (`https://qneura.ai` or `https://qneura.ai/apps.html`).
 - [ ] About screen footer includes ownership/copyright line and license summary.
-- [ ] Layout follows Librarius-style readable card stack (max-width constrained, high contrast, desktop-safe spacing).
+- [ ] Layout follows readable card stack pattern (max-width constrained, high contrast, desktop-safe spacing).
 - [ ] Changes must be additive: preserve existing app-specific details and links while adding missing compliance sections.
 
 ### Branding & Assets
