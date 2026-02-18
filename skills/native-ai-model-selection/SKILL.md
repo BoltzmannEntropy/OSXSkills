@@ -397,26 +397,145 @@ func similarity(image: CGImage, text: String) throws -> Float {
 
 ### 7. Document Processing / OCR
 
-#### Recommended Approaches
+#### Recommended Models
 
-| Tool | Framework | Best For |
-|------|-----------|----------|
-| **Vision Framework** | Native macOS | General OCR |
-| **VisionKit** | Native macOS | Document scanning |
-| **Tesseract** | C++ (via SPM) | Offline OCR |
-| **Florence-2** | ONNX | OCR + layout |
+| Model | Framework | Languages | Layout Detection | Best For |
+|-------|-----------|-----------|------------------|----------|
+| **PaddleOCR** | ONNX | 80+ | Yes | Production OCR, multilingual |
+| **PaddleOCR-VL** | ONNX/MLX | Multilingual | Yes | Vision-language OCR |
+| **Vision Framework** | Native macOS | System langs | No | Simple text extraction |
+| **VisionKit** | Native macOS | System langs | Yes | Document scanning UI |
+| **Florence-2** | ONNX | English | Yes | OCR + captioning |
+| **Tesseract** | C++ (via SPM) | 100+ | No | Offline, custom training |
+
+#### PaddleOCR (Recommended for Production)
+
+**Why PaddleOCR:**
+- State-of-the-art accuracy (PP-OCRv4)
+- 80+ language support
+- Text detection + recognition + layout analysis
+- Small model sizes (mobile-friendly)
+- Official ONNX export support
+
+**Model Variants:**
+
+| Model | Size | Use Case |
+|-------|------|----------|
+| PP-OCRv4 Server | ~150MB | Highest accuracy |
+| PP-OCRv4 Mobile | ~15MB | On-device, fast |
+| PP-Structure | ~50MB | Table/layout detection |
+
+**ONNX Export:**
+
+```bash
+# Export PaddleOCR to ONNX
+pip install paddle2onnx paddlepaddle paddleocr
+
+# Detection model
+paddle2onnx --model_dir ./ch_PP-OCRv4_det_infer \
+    --model_filename inference.pdmodel \
+    --params_filename inference.pdiparams \
+    --save_file det_model.onnx \
+    --opset_version 14
+
+# Recognition model
+paddle2onnx --model_dir ./ch_PP-OCRv4_rec_infer \
+    --model_filename inference.pdmodel \
+    --params_filename inference.pdiparams \
+    --save_file rec_model.onnx \
+    --opset_version 14
+```
+
+**Swift Integration (ONNX Runtime):**
+
+```swift
+import OnnxRuntime
+
+class PaddleOCR {
+    private let detSession: ORTSession  // Text detection
+    private let recSession: ORTSession  // Text recognition
+    private let clsSession: ORTSession? // Direction classifier (optional)
+
+    init(modelDir: URL) throws {
+        let detPath = modelDir.appendingPathComponent("det_model.onnx")
+        let recPath = modelDir.appendingPathComponent("rec_model.onnx")
+
+        detSession = try ORTSession(modelPath: detPath.path)
+        recSession = try ORTSession(modelPath: recPath.path)
+    }
+
+    func recognize(image: CGImage) throws -> [OCRResult] {
+        // 1. Preprocess image (resize, normalize)
+        let inputTensor = preprocessImage(image)
+
+        // 2. Run detection model
+        let detOutput = try detSession.run(inputs: ["x": inputTensor])
+        let boxes = postprocessDetection(detOutput)
+
+        // 3. Crop text regions and run recognition
+        var results: [OCRResult] = []
+        for box in boxes {
+            let cropped = cropRegion(image, box: box)
+            let recInput = preprocessForRecognition(cropped)
+            let recOutput = try recSession.run(inputs: ["x": recInput])
+            let text = decodeRecognition(recOutput)
+            results.append(OCRResult(box: box, text: text))
+        }
+
+        return results
+    }
+}
+
+struct OCRResult {
+    let box: [CGPoint]  // 4 corner points
+    let text: String
+    let confidence: Float
+}
+```
+
+**Resources:**
+- GitHub: `PaddlePaddle/PaddleOCR`
+- ONNX Models: `PaddlePaddle/PaddleOCR` releases
+- Issue #16825: PaddleOCR-VL multimodal integration
 
 #### Selection Criteria
 
 ```
-IF simple text extraction:
+IF need production-grade multilingual OCR:
+    → PaddleOCR via ONNX (PP-OCRv4)
+
+IF need vision-language understanding:
+    → PaddleOCR-VL or Florence-2
+
+IF simple English text extraction:
     → macOS Vision Framework (VNRecognizeTextRequest)
 
-IF need document structure:
-    → Florence-2 with OCR task
+IF need document structure/tables:
+    → PaddleOCR PP-Structure or Florence-2
 
-IF need offline with custom training:
-    → Tesseract via Swift wrapper
+IF need smallest model size:
+    → PaddleOCR Mobile (~15MB)
+
+IF need custom training/fine-tuning:
+    → PaddleOCR (extensive training tools) or Tesseract
+```
+
+#### Integration Pattern (Vision Framework - Simple)
+
+```swift
+import Vision
+
+func extractText(from image: CGImage) async throws -> String {
+    let request = VNRecognizeTextRequest()
+    request.recognitionLevel = .accurate
+    request.recognitionLanguages = ["en-US"]
+
+    let handler = VNImageRequestHandler(cgImage: image)
+    try handler.perform([request])
+
+    let observations = request.results ?? []
+    return observations.compactMap { $0.topCandidates(1).first?.string }.joined(separator: "\n")
+}
 ```
 
 ## Model Bundling Strategies
