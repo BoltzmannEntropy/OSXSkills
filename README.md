@@ -4,13 +4,47 @@ Production-ready skills for verifying and shipping macOS applications with Claud
 
 ## Overview
 
-This repository ships one release skill:
+This repository ships two release skills:
 
-- `app-store-code-review`
+### 1. `osx-app-compliance-check`
 
-The skill is a systematic code review process for applications targeting Apple App Store, Google Play, or desktop distribution. It identifies crash risks, security vulnerabilities, resource leaks, and compliance issues that cause rejection or poor user experience. It includes a mandatory cross-repo consistency pass for macOS app websites + README licensing language before release.
+**Infrastructure audit skill** that verifies all macOS app projects have proper DMG creation scripts, release notes, automatic versioning, license files, and distribution infrastructure.
+
+- Audits all projects in `artifacts/code/*PRJ/`
+- Checks for required files (RELEASE_NOTES.md, LICENSE.md, build scripts)
+- Verifies build script features (SHA256, auto version, license embedding)
+- Produces compliance report
+- Can automatically fix missing components
+
+**Use when:** Setting up new projects, periodic audits, before releases, after infrastructure changes.
+
+Primary source of truth: `skills/osx-app-compliance-check/SKILL.md`
+
+### 2. `app-store-code-review`
+
+**Code quality skill** for systematic review of applications targeting Apple App Store, Google Play, or desktop distribution. It identifies crash risks, security vulnerabilities, resource leaks, and compliance issues that cause rejection or poor user experience. It includes a mandatory cross-repo consistency pass for macOS app websites + README licensing language before release.
+
+**Use when:** Before App Store submission, before production release, after major features.
 
 Primary source of truth: `skills/app-store-code-review/SKILL.md`
+
+## Skill Relationship
+
+```
+osx-app-compliance-check          app-store-code-review
+        |                                  |
+        v                                  v
+  Infrastructure                     Code Quality
+  - DMG scripts                      - Crash prevention
+  - Release notes                    - Resource management
+  - Versioning                       - Security
+  - License files                    - Platform compliance
+  - Build features                   - MCP integration
+        |                                  |
+        +-----------> RELEASE <------------+
+```
+
+Run `osx-app-compliance-check` first to ensure infrastructure is in place, then run `app-store-code-review` for code quality verification.
 
 ## Rationale
 
@@ -257,9 +291,9 @@ No category is optional in a release review.
 - App bundle embeds `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`
 - DMG license agreement configured (when supported by the DMG toolchain)
 
-## DMG Creation Scripts: Complete Reference (MimikaStudio Pattern)
+## DMG Creation Scripts: Complete Reference
 
-This section provides a comprehensive guide to creating production-ready DMG installers for macOS apps with bundled Python backends, based on the MimikaStudio `build_dmg.sh` implementation.
+This section provides a comprehensive guide to creating production-ready DMG installers for macOS apps with bundled Python backends.
 
 ### Architecture Overview
 
@@ -293,7 +327,7 @@ SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
 
 # App configuration
-APP_NAME="MimikaStudio"
+APP_NAME="<AppName>"
 ARCH="$(uname -m)"                          # arm64 or x86_64
 BUILD_DIR="$PROJECT_DIR/build"
 DIST_DIR="$PROJECT_DIR/dist"
@@ -395,7 +429,7 @@ flutter build macos --release
 
 RELEASE_DIR="$PROJECT_DIR/flutter_app/build/macos/Build/Products/Release"
 FLUTTER_APP=""
-for candidate in "mimika_studio.app" "$APP_NAME.app"; do
+for candidate in "<appname>_studio.app" "$APP_NAME.app"; do
     if [ -d "$RELEASE_DIR/$candidate" ]; then
         FLUTTER_APP="$RELEASE_DIR/$candidate"
         break
@@ -421,11 +455,11 @@ ln -sfn /Applications "$DMG_STAGE_DIR/Applications"
 **Final staging directory structure:**
 ```
 build/dmg-stage/
-├── MimikaStudio.app/
+├── <AppName>.app/
 │   └── Contents/
 │       ├── Info.plist
 │       ├── MacOS/
-│       │   └── MimikaStudio
+│       │   └── <AppName>
 │       └── Resources/
 │           ├── backend/
 │           ├── python/
@@ -718,7 +752,7 @@ set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 RESOURCES_DIR="$(dirname "$SCRIPT_DIR")"
-APP_NAME="MimikaStudio"
+APP_NAME="<AppName>"
 
 # User-writable runtime directories (NOT in app bundle)
 APP_SUPPORT_DIR="${HOME}/Library/Application Support/${APP_NAME}"
@@ -730,11 +764,11 @@ mkdir -p "$APP_SUPPORT_DIR" "$APP_CACHE_DIR" "$APP_LOG_DIR"
 # Log file setup with fallback
 LOG_FILE="$APP_LOG_DIR/backend.log"
 if ! touch "$LOG_FILE" 2>/dev/null; then
-    LOG_FILE="/tmp/mimikastudio-backend.log"
+    LOG_FILE="/tmp/<appname>-backend.log"
     touch "$LOG_FILE"
 fi
 
-BACKEND_PORT="${MIMIKA_BACKEND_PORT:-7693}"
+BACKEND_PORT="${<APPNAME>_BACKEND_PORT:-7693}"
 PYTHON_BIN="$SCRIPT_DIR/venv/bin/python3"
 [ -x "$PYTHON_BIN" ] || { echo "Bundled Python not found" >&2; exit 1; }
 
@@ -752,16 +786,16 @@ done
 export PYTHONUNBUFFERED=1
 export PYTHONPYCACHEPREFIX="$APP_CACHE_DIR/pycache"
 export XDG_CACHE_HOME="$APP_CACHE_DIR"
-export MIMIKA_RUNTIME_HOME="$APP_SUPPORT_DIR"
-export MIMIKA_DATA_DIR="$APP_SUPPORT_DIR/data"
-export MIMIKA_LOG_DIR="$APP_LOG_DIR"
-export MIMIKA_OUTPUT_DIR="$APP_SUPPORT_DIR/outputs"
+export <APPNAME>_RUNTIME_HOME="$APP_SUPPORT_DIR"
+export <APPNAME>_DATA_DIR="$APP_SUPPORT_DIR/data"
+export <APPNAME>_LOG_DIR="$APP_LOG_DIR"
+export <APPNAME>_OUTPUT_DIR="$APP_SUPPORT_DIR/outputs"
 export HF_HOME="$APP_SUPPORT_DIR/huggingface"
 export HUGGINGFACE_HUB_CACHE="$HF_HOME/hub"
 export TRANSFORMERS_CACHE="$HUGGINGFACE_HUB_CACHE"
 export PYTHONPATH="$SCRIPT_DIR:$SITE_PACKAGES_DIR${PYTHONPATH:+:$PYTHONPATH}"
 
-mkdir -p "$MIMIKA_DATA_DIR" "$MIMIKA_OUTPUT_DIR" "$HUGGINGFACE_HUB_CACHE"
+mkdir -p "$<APPNAME>_DATA_DIR" "$<APPNAME>_OUTPUT_DIR" "$HUGGINGFACE_HUB_CACHE"
 
 cd "$SCRIPT_DIR"
 exec "$PYTHON_BIN" -m uvicorn main:app --host 127.0.0.1 --port "$BACKEND_PORT" >> "$LOG_FILE" 2>&1
@@ -892,22 +926,22 @@ log "SHA256: $SHA256"
 
 ```
 dist/
-├── MimikaStudio-2026.02.1-arm64.dmg
-├── MimikaStudio-2026.02.1-arm64.dmg.sha256
-├── MimikaStudio-2026.02.1-RELEASE_NOTES.md
-├── MimikaStudio-2026.02.1-RELEASE_NOTES.md.sha256
-├── MimikaStudio-2026.02.1-source.zip
-└── MimikaStudio-2026.02.1-source.zip.sha256
+├── <AppName>-2026.02.1-arm64.dmg
+├── <AppName>-2026.02.1-arm64.dmg.sha256
+├── <AppName>-2026.02.1-RELEASE_NOTES.md
+├── <AppName>-2026.02.1-RELEASE_NOTES.md.sha256
+├── <AppName>-2026.02.1-source.zip
+└── <AppName>-2026.02.1-source.zip.sha256
 ```
 
 ### App Bundle Final Structure
 
 ```
-MimikaStudio.app/
+<AppName>.app/
 └── Contents/
     ├── Info.plist
     ├── MacOS/
-    │   └── MimikaStudio          # Flutter executable
+    │   └── <AppName>          # Flutter executable
     └── Resources/
         ├── backend/
         │   ├── main.py           # FastAPI entry point
@@ -987,7 +1021,7 @@ xcrun stapler staple "$DMG_PATH"
 ### Complete build_dmg.sh Template
 
 See the full reference implementation at:
-- `MimikaCODE/scripts/build_dmg.sh`
+- `<AppName>CODE/scripts/build_dmg.sh`
 
 Key characteristics:
 - ~520 lines of production-tested bash
@@ -1065,7 +1099,7 @@ The skill treats MCP as required app surface for Claude interoperability. macOS 
 - `<domain>_list_*` - List available resources (voices, models, files, etc.)
 - `<domain>_<primary_action>` - Core functionality (generate, process, create)
 
-#### MCP Tool Schema Pattern (Reference: MimikaStudio)
+#### MCP Tool Schema Pattern (Reference: <AppName>)
 
 ```python
 MCP_TOOLS = [
@@ -1186,7 +1220,7 @@ class MCPHandler(BaseHTTPRequestHandler):
   ```
 - About page present and accessible from main navigation
 
-#### About Page Contents (Reference: MimikaStudio Pattern)
+#### About Page Contents (Reference: <AppName> Pattern)
 - App logo/icon prominently displayed
 - App name as headline
 - Version number from centralized version file
@@ -1211,7 +1245,7 @@ class MCPHandler(BaseHTTPRequestHandler):
 - About screen includes **Model Credits & Licenses** section with model/library names and license labels
 - About screen includes a **Legal** section with buttons/links to Privacy, Terms, and License surfaces
 - About screen footer includes ownership/copyright line and license summary
-- Layout follows Librarius-style readable card stack (max-width constrained, high contrast, desktop-safe spacing)
+- Layout follows readable card stack pattern (max-width constrained, high contrast, desktop-safe spacing)
 - Changes must be additive: preserve existing app-specific details and links while adding missing compliance sections
 
 #### Legal Pages
@@ -1293,7 +1327,7 @@ Additional consistency requirements:
 
 ## Website Privacy Consent Requirements
 
-Each app website must provide Mimika-style GDPR consent behavior:
+Each app website must provide proper GDPR consent behavior:
 
 - Script file: `<AppName>WEB/privacy-consent.js`
 - Loaded on `index.html`, `license.html`, `privacy.html`, `terms.html`
