@@ -697,22 +697,123 @@ func releaseModel() {
 | ONNX external data | Model load fails | Ensure .onnx_data files copied |
 | MLX cache bloat | Disk space issues | Clear `~/.cache/huggingface/hub/` |
 
+## Model Repository Reference
+
+### Text-to-Speech (TTS)
+
+| Model | Repository | HuggingFace | Notes |
+|-------|------------|-------------|-------|
+| **Qwen3-TTS** | - | [Qwen/Qwen3-TTS](https://huggingface.co/Qwen/Qwen3-TTS) | MLX: [mlx-community/Qwen3-TTS-*](https://huggingface.co/collections/mlx-community) |
+| **Kokoro** | [hexgrad/kokoro](https://github.com/hexgrad/kokoro) | [hexgrad/Kokoro-82M](https://huggingface.co/hexgrad/Kokoro-82M) | ONNX + MLX variants |
+| **Chatterbox** | [resemble-ai/chatterbox](https://github.com/resemble-ai/chatterbox) | [ResembleAI/chatterbox](https://huggingface.co/ResembleAI/chatterbox) | Multilingual voice cloning |
+| **Piper** | [rhasspy/piper](https://github.com/rhasspy/piper) | [rhasspy/piper-voices](https://huggingface.co/rhasspy/piper-voices) | Fast ONNX TTS |
+| **Coqui XTTS** | [coqui-ai/TTS](https://github.com/coqui-ai/TTS) | [coqui/XTTS-v2](https://huggingface.co/coqui/XTTS-v2) | Voice cloning |
+
+### Speech-to-Text (STT)
+
+| Model | Repository | HuggingFace | Notes |
+|-------|------------|-------------|-------|
+| **Whisper** | [openai/whisper](https://github.com/openai/whisper) | [openai/whisper-*](https://huggingface.co/openai/whisper-large-v3) | Official OpenAI |
+| **Whisper MLX** | [ml-explore/mlx-examples](https://github.com/ml-explore/mlx-examples/tree/main/whisper) | [mlx-community/whisper-*](https://huggingface.co/mlx-community) | Apple Silicon optimized |
+| **Whisper CoreML** | [argmaxinc/WhisperKit](https://github.com/argmaxinc/WhisperKit) | [argmaxinc/whisperkit-coreml](https://huggingface.co/argmaxinc/whisperkit-coreml) | ANE optimized |
+| **Faster-Whisper** | [SYSTRAN/faster-whisper](https://github.com/SYSTRAN/faster-whisper) | - | CTranslate2 backend |
+| **Distil-Whisper** | [huggingface/distil-whisper](https://github.com/huggingface/distil-whisper) | [distil-whisper/distil-large-v3](https://huggingface.co/distil-whisper/distil-large-v3) | 6x faster |
+
+### Text Embeddings
+
+| Model | Repository | HuggingFace | Notes |
+|-------|------------|-------------|-------|
+| **all-MiniLM-L6-v2** | [sentence-transformers](https://github.com/UKPLab/sentence-transformers) | [sentence-transformers/all-MiniLM-L6-v2](https://huggingface.co/sentence-transformers/all-MiniLM-L6-v2) | 384-dim, fast |
+| **all-mpnet-base-v2** | [sentence-transformers](https://github.com/UKPLab/sentence-transformers) | [sentence-transformers/all-mpnet-base-v2](https://huggingface.co/sentence-transformers/all-mpnet-base-v2) | 768-dim, quality |
+| **E5-small/base/large** | - | [intfloat/e5-small-v2](https://huggingface.co/intfloat/e5-small-v2) | Microsoft embeddings |
+| **BGE-small/base/large** | [FlagOpen/FlagEmbedding](https://github.com/FlagOpen/FlagEmbedding) | [BAAI/bge-small-en-v1.5](https://huggingface.co/BAAI/bge-small-en-v1.5) | Best quality/size |
+| **BGE-reranker** | [FlagOpen/FlagEmbedding](https://github.com/FlagOpen/FlagEmbedding) | [BAAI/bge-reranker-base](https://huggingface.co/BAAI/bge-reranker-base) | Cross-encoder reranking |
+| **Nomic Embed** | [nomic-ai/contrastors](https://github.com/nomic-ai/contrastors) | [nomic-ai/nomic-embed-text-v1.5](https://huggingface.co/nomic-ai/nomic-embed-text-v1.5) | 8K context |
+
+### Vision / Captioning
+
+| Model | Repository | HuggingFace | Notes |
+|-------|------------|-------------|-------|
+| **CLIP** | [openai/CLIP](https://github.com/openai/CLIP) | [openai/clip-vit-base-patch32](https://huggingface.co/openai/clip-vit-base-patch32) | Image-text matching |
+| **SigLIP** | - | [google/siglip-base-patch16-224](https://huggingface.co/google/siglip-base-patch16-224) | Better CLIP |
+| **BLIP-2** | [salesforce/LAVIS](https://github.com/salesforce/LAVIS) | [Salesforce/blip2-opt-2.7b](https://huggingface.co/Salesforce/blip2-opt-2.7b) | Captioning |
+| **LLaVA** | [haotian-liu/LLaVA](https://github.com/haotian-liu/LLaVA) | [llava-hf/llava-1.5-7b-hf](https://huggingface.co/llava-hf/llava-1.5-7b-hf) | Visual QA |
+| **LLaVA MLX** | [ml-explore/mlx-vlm](https://github.com/ml-explore/mlx-vlm) | [mlx-community/llava-*](https://huggingface.co/mlx-community) | Apple Silicon |
+| **Florence-2** | - | [microsoft/Florence-2-base](https://huggingface.co/microsoft/Florence-2-base) | Multi-task vision |
+| **Moondream** | [vikhyat/moondream](https://github.com/vikhyat/moondream) | [vikhyatk/moondream2](https://huggingface.co/vikhyatk/moondream2) | Tiny VLM (1.8B) |
+
+### OCR / Document Processing
+
+| Model | Repository | HuggingFace | Notes |
+|-------|------------|-------------|-------|
+| **PaddleOCR** | [PaddlePaddle/PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR) | [PaddlePaddle/PaddleOCR](https://huggingface.co/PaddlePaddle) | 80+ langs, ONNX export |
+| **PaddleOCR-VL** | [PaddlePaddle/PaddleOCR](https://github.com/PaddlePaddle/PaddleOCR/issues/16825) | - | Vision-language OCR |
+| **EasyOCR** | [JaidedAI/EasyOCR](https://github.com/JaidedAI/EasyOCR) | - | Simple API, 80+ langs |
+| **Tesseract** | [tesseract-ocr/tesseract](https://github.com/tesseract-ocr/tesseract) | - | Classic, 100+ langs |
+| **Tesseract Swift** | [nicoster/SwiftyTesseract](https://github.com/nicoster/SwiftyTesseract) | - | Swift wrapper |
+| **GOT-OCR** | [Ucas-HaoranWei/GOT-OCR2.0](https://github.com/Ucas-HaoranWei/GOT-OCR2.0) | [ucaslcl/GOT-OCR2_0](https://huggingface.co/ucaslcl/GOT-OCR2_0) | Document understanding |
+| **DocTR** | [mindee/doctr](https://github.com/mindee/doctr) | [mindee/doctr](https://huggingface.co/mindee) | Document OCR |
+
+### Lexical Search
+
+| Tool | Repository | Notes |
+|------|------------|-------|
+| **Tantivy** | [quickwit-oss/tantivy](https://github.com/quickwit-oss/tantivy) | Rust full-text search |
+| **Tantivy Swift** | [nicoster/tantivy-swift](https://github.com/nicoster/tantivy-swift) | Swift FFI bridge |
+| **MeiliSearch** | [meilisearch/meilisearch](https://github.com/meilisearch/meilisearch) | Rust, easy to use |
+| **SQLite FTS5** | Built-in | macOS native |
+
+### LLMs (Local Inference)
+
+| Model | Repository | HuggingFace | Notes |
+|-------|------------|-------------|-------|
+| **Llama 3.2** | - | [meta-llama/Llama-3.2-3B-Instruct](https://huggingface.co/meta-llama/Llama-3.2-3B-Instruct) | 1B/3B variants |
+| **Qwen2.5** | [QwenLM/Qwen2.5](https://github.com/QwenLM/Qwen2.5) | [Qwen/Qwen2.5-7B-Instruct](https://huggingface.co/Qwen/Qwen2.5-7B-Instruct) | 0.5B-72B |
+| **Phi-3** | - | [microsoft/Phi-3-mini-4k-instruct](https://huggingface.co/microsoft/Phi-3-mini-4k-instruct) | Microsoft small LLM |
+| **Gemma 2** | - | [google/gemma-2-2b-it](https://huggingface.co/google/gemma-2-2b-it) | Google 2B/9B/27B |
+| **Mistral** | [mistralai/mistral-src](https://github.com/mistralai/mistral-src) | [mistralai/Mistral-7B-Instruct-v0.3](https://huggingface.co/mistralai/Mistral-7B-Instruct-v0.3) | 7B quality |
+
+### Frameworks & Tools
+
+| Framework | Repository | Notes |
+|-----------|------------|-------|
+| **MLX** | [ml-explore/mlx](https://github.com/ml-explore/mlx) | Apple ML framework |
+| **MLX Swift** | [ml-explore/mlx-swift](https://github.com/ml-explore/mlx-swift) | Swift bindings |
+| **MLX Examples** | [ml-explore/mlx-examples](https://github.com/ml-explore/mlx-examples) | Reference implementations |
+| **MLX Audio** | [ml-explore/mlx-audio](https://github.com/ml-explore/mlx-audio) | Audio models (TTS, STT) |
+| **MLX VLM** | [ml-explore/mlx-vlm](https://github.com/ml-explore/mlx-vlm) | Vision-language models |
+| **ONNX Runtime** | [microsoft/onnxruntime](https://github.com/microsoft/onnxruntime) | Cross-platform inference |
+| **ONNX Runtime Swift** | [pmusolino/onnxruntime-swift](https://github.com/pmusolino/onnxruntime-swift) | Swift package |
+| **CoreMLTools** | [apple/coremltools](https://github.com/apple/coremltools) | Convert to CoreML |
+| **Swift Transformers** | [huggingface/swift-transformers](https://github.com/huggingface/swift-transformers) | HF Swift SDK |
+| **Wax** | Internal | Vector search + embeddings |
+
+### Vector Databases (Optional)
+
+| Database | Repository | Notes |
+|----------|------------|-------|
+| **Qdrant** | [qdrant/qdrant](https://github.com/qdrant/qdrant) | Rust, fast |
+| **Chroma** | [chroma-core/chroma](https://github.com/chroma-core/chroma) | Simple, Python |
+| **LanceDB** | [lancedb/lancedb](https://github.com/lancedb/lancedb) | Embedded, serverless |
+| **SQLite + vss** | [asg017/sqlite-vss](https://github.com/asg017/sqlite-vss) | Vector extension |
+
 ## Framework-Specific Resources
 
 ### MLX
-- Repository: `ml-explore/mlx-swift`
-- Models: `mlx-community/*` on HuggingFace
-- Audio: `ml-explore/mlx-audio`
+- Repository: [ml-explore/mlx-swift](https://github.com/ml-explore/mlx-swift)
+- Models: [mlx-community](https://huggingface.co/mlx-community) on HuggingFace
+- Audio: [ml-explore/mlx-audio](https://github.com/ml-explore/mlx-audio)
+- Examples: [ml-explore/mlx-examples](https://github.com/ml-explore/mlx-examples)
 
 ### Core ML
-- Conversion: `coremltools` Python package
-- Model Zoo: Apple Core ML Models
-- Optimization: Xcode ML Model Compilation
+- Conversion: [apple/coremltools](https://github.com/apple/coremltools)
+- Model Zoo: [Apple Core ML Models](https://developer.apple.com/machine-learning/models/)
+- WhisperKit: [argmaxinc/WhisperKit](https://github.com/argmaxinc/WhisperKit)
 
 ### ONNX Runtime
-- Swift Package: `pmusolino/onnxruntime-swift`
-- Model Zoo: ONNX Model Zoo, HuggingFace
-- Execution Providers: CoreML EP for Apple Silicon
+- Swift Package: [pmusolino/onnxruntime-swift](https://github.com/pmusolino/onnxruntime-swift)
+- Model Zoo: [ONNX Model Zoo](https://github.com/onnx/models)
+- HuggingFace ONNX: [huggingface/optimum](https://github.com/huggingface/optimum)
 
 ## Related Skills
 
