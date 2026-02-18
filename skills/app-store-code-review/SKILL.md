@@ -284,6 +284,102 @@ digraph review_flow {
   - Last 50 lines of runtime logs
   - Timestamped output file
 
+### Release Scripts (Mandatory for All macOS Apps)
+
+Every macOS app MUST have a `scripts/release.sh` that automates the full release workflow. Manual releases are error-prone and forbidden.
+
+#### Release Script Requirements
+- [ ] **Release script** (`scripts/release.sh`) exists and is executable
+- [ ] Script extracts version from `pubspec.yaml` automatically (no hardcoded versions)
+- [ ] Script supports `--upload` flag for GitHub release upload
+- [ ] Script supports `--sync-website` flag for website download link updates
+- [ ] Script generates SHA256 checksum alongside DMG
+- [ ] Script creates GitHub release as DRAFT (not auto-published)
+- [ ] Script updates website download URLs with new version
+- [ ] Script commits and pushes website changes automatically
+- [ ] Script provides clear success/failure output with colored status
+
+#### Version Advancement Protocol
+- [ ] Version follows semantic versioning: `MAJOR.MINOR.PATCH` (e.g., `1.0.0`, `1.1.0`, `2.0.0`)
+- [ ] Version is stored in a single source of truth: `pubspec.yaml` for Flutter apps
+- [ ] Build number increments with each release (e.g., `1.0.0+1` → `1.0.0+2`)
+- [ ] Release tag format: `v{VERSION}` (e.g., `v1.0.0`, `v1.1.0`)
+- [ ] Never reuse version numbers - always increment
+- [ ] PATCH version for bug fixes (1.0.0 → 1.0.1)
+- [ ] MINOR version for new features (1.0.0 → 1.1.0)
+- [ ] MAJOR version for breaking changes (1.0.0 → 2.0.0)
+
+#### Release Script Pattern (Reference: Mayari/Zephaniah)
+```bash
+#!/usr/bin/env bash
+# scripts/release.sh - Full Release Script
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+WEBSITE_DIR="$(dirname "$PROJECT_DIR")/${APP_NAME}WEB"
+
+# Extract version from pubspec.yaml
+VERSION=$(grep 'version:' "$PROJECT_DIR/pubspec.yaml" | head -1 | cut -d'+' -f1 | cut -d':' -f2 | xargs)
+
+# Parse flags
+UPLOAD_TO_GITHUB=false
+SYNC_WEBSITE=false
+for arg in "$@"; do
+    case $arg in
+        --upload) UPLOAD_TO_GITHUB=true ;;
+        --sync-website) SYNC_WEBSITE=true ;;
+    esac
+done
+
+# 1. Build DMG
+"$SCRIPT_DIR/build_dmg.sh" || "$SCRIPT_DIR/build-dmg.sh"
+
+# 2. Generate SHA256
+DMG_PATH="$PROJECT_DIR/build/${APP_NAME}-${VERSION}.dmg"
+shasum -a 256 "$DMG_PATH" > "$DMG_PATH.sha256"
+
+# 3. Upload to GitHub (if --upload)
+if [ "$UPLOAD_TO_GITHUB" = true ]; then
+    TAG="v$VERSION"
+    if ! gh release view "$TAG" &> /dev/null; then
+        gh release create "$TAG" --title "$APP_NAME $VERSION" --notes "Release notes..." --draft
+    fi
+    gh release upload "$TAG" "$DMG_PATH" "$DMG_PATH.sha256" --clobber
+fi
+
+# 4. Sync website (if --sync-website)
+if [ "$SYNC_WEBSITE" = true ]; then
+    sed -i '' -E "s|/releases/download/v[0-9.]+/${APP_NAME}-[0-9.]+|/releases/download/v$VERSION/${APP_NAME}-$VERSION|g" "$WEBSITE_DIR/index.html"
+    cd "$WEBSITE_DIR"
+    git add index.html && git commit -m "Update to v$VERSION" && git push
+fi
+```
+
+#### Release Checklist (Execute in Order)
+1. [ ] Verify all tests pass
+2. [ ] Update version in `pubspec.yaml` if needed
+3. [ ] Run `./scripts/release.sh --upload --sync-website`
+4. [ ] Verify DMG created and checksum generated
+5. [ ] Verify GitHub release created as draft
+6. [ ] Verify release assets uploaded (DMG + SHA256)
+7. [ ] Verify website download links updated
+8. [ ] Verify website changes committed and pushed
+9. [ ] Test DMG download from GitHub release page
+10. [ ] Publish GitHub release (remove draft status)
+
+#### Release Script Red Flags
+| Issue | Pattern | Fix |
+|-------|---------|-----|
+| No release script | Manual DMG + upload | Create `scripts/release.sh` |
+| Hardcoded version | `VERSION="1.0.0"` | Extract from `pubspec.yaml` |
+| No --upload flag | Separate manual upload | Add GitHub release upload |
+| No --sync-website | Manual website edit | Add website URL update |
+| No checksum | DMG only | Generate `.sha256` file |
+| Auto-publish | Non-draft release | Create as `--draft` |
+| No website commit | Website not updated | Auto-commit and push |
+| Version reuse | Same tag twice | Always increment version |
+
 ### General
 - [ ] Version number format correct
 - [ ] Build number incremented
@@ -1237,6 +1333,11 @@ Generate report with this structure:
 | No installer | Complex setup steps | Add `install.sh` with dependency checks |
 | No diagnostics | Hard to debug issues | Add `issues.sh` with system info + logs |
 | No DMG script | Manual DMG creation | Add `scripts/build_dmg.sh` |
+| No release script | Manual GitHub uploads | Add `scripts/release.sh` with --upload --sync-website |
+| Hardcoded version | Version not from pubspec | Extract version from `pubspec.yaml` |
+| No website sync | Manual download link edits | Add --sync-website flag to release script |
+| Version reuse | Same tag released twice | Always increment version before release |
+| No SHA256 checksum | DMG without verification | Generate `.sha256` alongside DMG |
 | Deprecated Flutter API | `withOpacity()` usage | Replace with `withValues(alpha:)` |
 | No dark mode | Only light theme | Add `ThemeMode.system` support |
 
@@ -1304,3 +1405,13 @@ After review, offer to fix issues:
 - MCP UI missing tool discovery/list
 - MCP UI missing Claude Code configuration helper
 - MCP UI missing server status/controls
+- No `scripts/release.sh` for automated releases
+- Release script missing `--upload` flag for GitHub upload
+- Release script missing `--sync-website` flag for website updates
+- Manual GitHub release uploads (no automation)
+- Manual website download link edits (no sync script)
+- Version hardcoded in release script instead of extracted from `pubspec.yaml`
+- DMG released without SHA256 checksum file
+- Version number reused for different releases
+- GitHub release auto-published instead of created as draft
+- Website download links not updated after release

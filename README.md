@@ -257,6 +257,747 @@ No category is optional in a release review.
 - App bundle embeds `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`
 - DMG license agreement configured (when supported by the DMG toolchain)
 
+## DMG Creation Scripts: Complete Reference (MimikaStudio Pattern)
+
+This section provides a comprehensive guide to creating production-ready DMG installers for macOS apps with bundled Python backends, based on the MimikaStudio `build_dmg.sh` implementation.
+
+### Architecture Overview
+
+```dot
+digraph dmg_build_flow {
+    rankdir=TB;
+    node [shape=box];
+
+    "1. Setup Variables" -> "2. Build Flutter App";
+    "2. Build Flutter App" -> "3. Create DMG Staging";
+    "3. Create DMG Staging" -> "4. Bundle Backend Code";
+    "4. Bundle Backend Code" -> "5. Bundle Python Runtime";
+    "5. Bundle Python Runtime" -> "6. Bundle Dependencies";
+    "6. Bundle Dependencies" -> "7. Patch Mach-O Binaries";
+    "7. Patch Mach-O Binaries" -> "8. Setup venv Interpreter";
+    "8. Setup venv Interpreter" -> "9. Write Backend Launcher";
+    "9. Write Backend Launcher" -> "10. Re-sign Binaries";
+    "10. Re-sign Binaries" -> "11. Create DMG";
+    "11. Create DMG" -> "12. Generate Artifacts";
+}
+```
+
+### Script Structure and Variables
+
+```bash
+#!/bin/bash
+set -euo pipefail
+
+# Directory resolution
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+# App configuration
+APP_NAME="MimikaStudio"
+ARCH="$(uname -m)"                          # arm64 or x86_64
+BUILD_DIR="$PROJECT_DIR/build"
+DIST_DIR="$PROJECT_DIR/dist"
+DMG_STAGE_DIR="$BUILD_DIR/dmg-stage"
+APP_BUNDLE="$DMG_STAGE_DIR/$APP_NAME.app"
+APP_RESOURCES="$APP_BUNDLE/Contents/Resources"
+BUNDLED_BACKEND="$APP_RESOURCES/backend"
+BUNDLED_PYTHON="$APP_RESOURCES/python"
+MLX_ONLY_BUILD="${MLX_ONLY_BUILD:-1}"       # Set to 0 to include torch
+```
+
+### Version Extraction from Centralized Version File
+
+```bash
+read_version_field() {
+    local field="$1"
+    python3 - <<PY
+namespace = {}
+with open("$PROJECT_DIR/backend/version.py", "r", encoding="utf-8") as f:
+    exec(f.read(), namespace)
+print(namespace["$field"])
+PY
+}
+
+VERSION="$(read_version_field VERSION)"
+BUILD_NUMBER="$(read_version_field BUILD_NUMBER)"
+```
+
+The corresponding `backend/version.py`:
+
+```python
+VERSION = "2026.02.1"
+BUILD_NUMBER = 42
+VERSION_NAME = "Sunrise"
+```
+
+### Python Environment Resolution
+
+```bash
+# Find the source virtual environment
+resolve_source_venv() {
+    if [ -d "$PROJECT_DIR/backend/venv" ]; then
+        echo "$PROJECT_DIR/backend/venv"
+        return
+    fi
+    if [ -d "$PROJECT_DIR/venv" ]; then
+        echo "$PROJECT_DIR/venv"
+        return
+    fi
+    die "No Python virtual environment found."
+}
+
+# Find the base Python installation (e.g., Homebrew Python)
+resolve_python_home() {
+    local source_venv="$1"
+    local cfg="$source_venv/pyvenv.cfg"
+    local home=""
+
+    if [ -f "$cfg" ]; then
+        home="$(awk -F ' = ' '/^home = / { print $2; exit }' "$cfg" || true)"
+    fi
+
+    if [ -n "$home" ] && [ -d "$home" ]; then
+        echo "${home%/bin}"
+        return
+    fi
+
+    # Fallback: follow python3 symlink
+    local py3_target
+    py3_target="$(readlink "$source_venv/bin/python3" 2>/dev/null || true)"
+    if [ -n "$py3_target" ] && [ -d "${py3_target%/bin/*}" ]; then
+        echo "${py3_target%/bin/*}"
+        return
+    fi
+
+    die "Unable to resolve base Python installation"
+}
+
+# Extract Python version tag (e.g., python3.11)
+resolve_python_tag() {
+    local source_venv="$1"
+    local py_lib
+    py_lib="$(find "$source_venv/lib" -maxdepth 1 -type d -name 'python*' | head -n 1)"
+    basename "$py_lib"
+}
+
+SOURCE_VENV="$(resolve_source_venv)"
+PYTHON_HOME="$(resolve_python_home "$SOURCE_VENV")"
+PYTHON_TAG="$(resolve_python_tag "$SOURCE_VENV")"   # e.g., python3.11
+PYTHON_SHORT="${PYTHON_TAG#python}"                 # e.g., 3.11
+```
+
+### Building Flutter macOS App
+
+```bash
+log "Building Flutter app..."
+cd "$PROJECT_DIR/flutter_app"
+flutter build macos --release
+
+RELEASE_DIR="$PROJECT_DIR/flutter_app/build/macos/Build/Products/Release"
+FLUTTER_APP=""
+for candidate in "mimika_studio.app" "$APP_NAME.app"; do
+    if [ -d "$RELEASE_DIR/$candidate" ]; then
+        FLUTTER_APP="$RELEASE_DIR/$candidate"
+        break
+    fi
+done
+[ -n "$FLUTTER_APP" ] && [ -d "$FLUTTER_APP" ] || die "Flutter build failed"
+```
+
+### DMG Staging Directory Setup
+
+```bash
+log "Preparing DMG staging..."
+rm -rf "$DMG_STAGE_DIR"
+mkdir -p "$DMG_STAGE_DIR"
+
+# Copy Flutter app bundle
+cp -R "$FLUTTER_APP" "$APP_BUNDLE"
+
+# Create Applications symlink for drag-to-install
+ln -sfn /Applications "$DMG_STAGE_DIR/Applications"
+```
+
+**Final staging directory structure:**
+```
+build/dmg-stage/
+├── MimikaStudio.app/
+│   └── Contents/
+│       ├── Info.plist
+│       ├── MacOS/
+│       │   └── MimikaStudio
+│       └── Resources/
+│           ├── backend/
+│           ├── python/
+│           └── ...
+└── Applications -> /Applications
+```
+
+### Bundling Backend Source Code
+
+```bash
+log "Bundling backend source..."
+mkdir -p "$BUNDLED_BACKEND"
+rsync -a \
+    --delete \
+    --exclude '__pycache__/' \
+    --exclude '.pytest_cache/' \
+    --exclude '*.pyc' \
+    --exclude '*.pyo' \
+    --exclude '.DS_Store' \
+    --exclude 'tests/' \
+    --exclude 'venv/' \
+    --exclude 'models/' \
+    --exclude 'outputs/' \
+    --exclude '*.db' \
+    "$PROJECT_DIR/backend/" \
+    "$BUNDLED_BACKEND/"
+
+# Preserve model registry .py files without heavyweight model payloads
+mkdir -p "$BUNDLED_BACKEND/models" "$BUNDLED_BACKEND/outputs"
+if [ -d "$PROJECT_DIR/backend/models" ]; then
+    rsync -a \
+        --exclude '__pycache__/' \
+        --exclude '*.pyc' \
+        --include '*/' \
+        --include '*.py' \
+        --exclude '*' \
+        "$PROJECT_DIR/backend/models/" \
+        "$BUNDLED_BACKEND/models/"
+fi
+```
+
+### Bundling Python Runtime
+
+```bash
+log "Bundling Python runtime..."
+mkdir -p "$BUNDLED_PYTHON"
+rsync -a \
+    --delete \
+    --exclude '__pycache__/' \
+    --exclude '.DS_Store' \
+    --exclude 'share/' \
+    --exclude 'lib/python*/site-packages/' \
+    --exclude 'lib/python*/test/' \
+    "$PYTHON_HOME/" \
+    "$BUNDLED_PYTHON/"
+```
+
+This copies the entire Python installation (typically from Homebrew) but excludes site-packages (which come from the venv) and test directories.
+
+### Bundling Backend Dependencies from venv
+
+```bash
+log "Bundling backend dependencies..."
+rm -rf "$BUNDLED_BACKEND/venv"
+cp -R "$SOURCE_VENV" "$BUNDLED_BACKEND/venv"
+
+# Clean up unnecessary files
+rm -rf "$BUNDLED_BACKEND/venv/include" "$BUNDLED_BACKEND/venv/share"
+find "$BUNDLED_BACKEND/venv" -type d -name '__pycache__' -prune -exec rm -rf {} + 2>/dev/null || true
+find "$BUNDLED_BACKEND/venv" -type d -name 'tests' -prune -exec rm -rf {} + 2>/dev/null || true
+find "$BUNDLED_BACKEND/venv" -type f \( -name '*.pyc' -o -name '*.pyo' \) -delete 2>/dev/null || true
+find "$BUNDLED_BACKEND/venv" -name '.DS_Store' -type f -delete 2>/dev/null || true
+```
+
+### MLX-Only Build Pruning (Optional)
+
+For Apple Silicon MLX-only builds, remove PyTorch and other heavyweight packages:
+
+```bash
+if [ "$MLX_ONLY_BUILD" = "1" ]; then
+    log "Pruning non-MLX payloads..."
+    BUNDLED_SITE_PACKAGES="$BUNDLED_BACKEND/venv/lib/$PYTHON_TAG/site-packages"
+    if [ -d "$BUNDLED_SITE_PACKAGES" ]; then
+        for pattern in \
+            "torch" "torch-*.dist-info" \
+            "torchaudio" "torchaudio-*.dist-info" \
+            "torchgen" \
+            "gradio" "gradio-*.dist-info" \
+            "pandas" "pandas-*.dist-info" \
+            "matplotlib" "matplotlib-*.dist-info" \
+            "pip" "pip-*.dist-info" \
+            "setuptools" "setuptools-*.dist-info"; do
+            find "$BUNDLED_SITE_PACKAGES" -maxdepth 1 -name "$pattern" \
+                -exec rm -rf {} + 2>/dev/null || true
+        done
+    fi
+fi
+```
+
+### Mach-O Binary Patching for Portability
+
+This is the most critical section for creating portable app bundles. It rewrites absolute dylib paths to `@loader_path`-relative references.
+
+#### Helper Functions
+
+```bash
+# Check if file is a Mach-O binary
+is_macho_file() {
+    local f="$1"
+    [ -f "$f" ] || return 1
+    file "$f" 2>/dev/null | grep -q "Mach-O"
+}
+
+# Check if dependency is a system library (should not be vendored)
+is_system_dep() {
+    local dep="$1"
+    case "$dep" in
+        @*)                                           return 0 ;;  # Already relative
+        /usr/lib/*)                                   return 0 ;;  # System libs
+        /System/Library/*)                            return 0 ;;  # System frameworks
+        /System/Volumes/Preboot/Cryptexes/OS/usr/lib/*) return 0 ;;  # macOS 13+ system
+    esac
+    return 1
+}
+
+# Calculate @loader_path-relative reference
+loader_ref_to_python_lib() {
+    local from_file="$1"
+    local to_file="$2"
+    python3 - <<PY
+import os
+from_dir = os.path.dirname(os.path.abspath("$from_file"))
+to_file = os.path.abspath("$to_file")
+rel = os.path.relpath(to_file, from_dir).replace("\\\\", "/")
+print(f"@loader_path/{rel}")
+PY
+}
+```
+
+#### Main Patching Function
+
+```bash
+patch_macho_deps() {
+    local bin="$1"
+    is_macho_file "$bin" || return 0
+
+    local dep
+    while IFS= read -r dep; do
+        [ -n "$dep" ] || continue
+        if is_system_dep "$dep"; then
+            continue
+        fi
+
+        local resolved_dep="$dep"
+        local dep_name dep_pkg dep_pkg_candidate
+        dep_name="$(basename "$dep")"
+
+        # Handle wheel-local .dylibs directories
+        if [ ! -f "$resolved_dep" ]; then
+            if [[ "$dep" == */.dylibs/* ]]; then
+                dep_pkg="$(echo "$dep" | sed -E 's#.*/([^/]+)/\.dylibs/.*#\1#')"
+                dep_pkg_candidate="$BUNDLED_BACKEND/venv/lib/$PYTHON_TAG/site-packages/$dep_pkg/.dylibs/$dep_name"
+                if [ -f "$dep_pkg_candidate" ]; then
+                    resolved_dep="$dep_pkg_candidate"
+                fi
+            fi
+        fi
+
+        # Try local .dylibs directories
+        if [ ! -f "$resolved_dep" ]; then
+            local dep_local1 dep_local2
+            dep_local1="$(dirname "$bin")/.dylibs/$dep_name"
+            dep_local2="$(dirname "$(dirname "$bin")")/.dylibs/$dep_name"
+            if [ -f "$dep_local1" ]; then
+                resolved_dep="$dep_local1"
+            elif [ -f "$dep_local2" ]; then
+                resolved_dep="$dep_local2"
+            fi
+        fi
+
+        if [ ! -f "$resolved_dep" ]; then
+            log "Warning: unresolved dependency for $(basename "$bin"): $dep"
+            continue
+        fi
+
+        # Copy dependency to bundled python lib
+        local dep_dst dep_ref
+        dep_dst="$BUNDLED_PYTHON/lib/$dep_name"
+
+        if [ ! -f "$dep_dst" ]; then
+            cp -f "$resolved_dep" "$dep_dst"
+            chmod 755 "$dep_dst" 2>/dev/null || true
+        fi
+
+        # Rewrite the reference
+        dep_ref="$(loader_ref_to_python_lib "$bin" "$dep_dst")"
+        install_name_tool -change "$dep" "$dep_ref" "$bin" 2>/dev/null || true
+    done < <(otool -L "$bin" 2>/dev/null | awk 'NR>1 {print $1}')
+
+    # Normalize install-id for vendored dylibs
+    case "$bin" in
+        *.dylib)
+            install_name_tool -id "@loader_path/$(basename "$bin")" "$bin" 2>/dev/null || true
+            ;;
+    esac
+}
+```
+
+#### Multi-Pass Vendoring
+
+Multiple passes catch dependencies of newly-vendored dylibs:
+
+```bash
+vendor_python_runtime_deps() {
+    local tmp_list pass
+    tmp_list="$(mktemp)"
+
+    # Seed with executables and extension modules
+    find "$BUNDLED_PYTHON/bin" -maxdepth 1 -type f > "$tmp_list"
+    find "$BUNDLED_PYTHON/lib" -type f \( -name "*.so" -o -name "*.dylib" \) >> "$tmp_list"
+    find "$BUNDLED_BACKEND/venv/lib/$PYTHON_TAG/site-packages" \
+        -type f \( -name "*.so" -o -name "*.dylib" \) >> "$tmp_list" 2>/dev/null || true
+
+    # Multiple passes for transitive dependencies
+    for pass in 1 2 3 4 5 6; do
+        while IFS= read -r candidate; do
+            [ -n "$candidate" ] || continue
+            patch_macho_deps "$candidate"
+        done < "$tmp_list"
+
+        # Refresh list to include newly-vendored dylibs
+        find "$BUNDLED_PYTHON/bin" -maxdepth 1 -type f > "$tmp_list"
+        find "$BUNDLED_PYTHON/lib" -type f \( -name "*.so" -o -name "*.dylib" \) >> "$tmp_list"
+        find "$BUNDLED_BACKEND/venv/lib/$PYTHON_TAG/site-packages" \
+            -type f \( -name "*.so" -o -name "*.dylib" \) >> "$tmp_list" 2>/dev/null || true
+    done
+
+    rm -f "$tmp_list"
+}
+
+vendor_python_runtime_deps
+```
+
+### Setting Up the Bundled venv Interpreter
+
+```bash
+# Remove old symlinks
+rm -f "$BUNDLED_BACKEND/venv/bin/python" \
+      "$BUNDLED_BACKEND/venv/bin/python3" \
+      "$BUNDLED_BACKEND/venv/bin/python$PYTHON_SHORT"
+
+# Copy real interpreter (avoid dyld issues with symlinks under app translocation)
+cp -f "$BUNDLED_PYTHON/bin/$BUNDLED_PY_EXEC" "$BUNDLED_BACKEND/venv/bin/python3"
+chmod 755 "$BUNDLED_BACKEND/venv/bin/python3"
+
+# Rewrite venv interpreter dependencies to point to bundled python lib
+while IFS= read -r dep; do
+    [ -n "$dep" ] || continue
+    case "$dep" in
+        /usr/lib/*|/System/Library/*|/System/Volumes/Preboot/Cryptexes/OS/usr/lib/*)
+            continue ;;
+    esac
+    dep_name="$(basename "$dep")"
+    install_name_tool \
+        -change "$dep" "@loader_path/../../../python/lib/$dep_name" \
+        "$BUNDLED_BACKEND/venv/bin/python3" 2>/dev/null || true
+done < <(otool -L "$BUNDLED_BACKEND/venv/bin/python3" 2>/dev/null | awk 'NR>1 {print $1}')
+
+# Create symlinks
+ln -sf "python3" "$BUNDLED_BACKEND/venv/bin/python"
+ln -sf "python3" "$BUNDLED_BACKEND/venv/bin/python$PYTHON_SHORT"
+
+# Write pyvenv.cfg with relative paths
+cat > "$BUNDLED_BACKEND/venv/pyvenv.cfg" <<CFG
+home = ../python/bin
+include-system-site-packages = false
+version = ${PYTHON_SHORT}.0
+executable = ../python/bin/$BUNDLED_PY_EXEC
+CFG
+```
+
+### Backend Launcher Script
+
+The launcher script sets up the runtime environment and starts the backend:
+
+```bash
+cat > "$BUNDLED_BACKEND/run_backend.sh" <<'LAUNCHER'
+#!/bin/bash
+set -euo pipefail
+
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+RESOURCES_DIR="$(dirname "$SCRIPT_DIR")"
+APP_NAME="MimikaStudio"
+
+# User-writable runtime directories (NOT in app bundle)
+APP_SUPPORT_DIR="${HOME}/Library/Application Support/${APP_NAME}"
+APP_CACHE_DIR="${HOME}/Library/Caches/${APP_NAME}"
+APP_LOG_DIR="${HOME}/Library/Logs/${APP_NAME}"
+
+mkdir -p "$APP_SUPPORT_DIR" "$APP_CACHE_DIR" "$APP_LOG_DIR"
+
+# Log file setup with fallback
+LOG_FILE="$APP_LOG_DIR/backend.log"
+if ! touch "$LOG_FILE" 2>/dev/null; then
+    LOG_FILE="/tmp/mimikastudio-backend.log"
+    touch "$LOG_FILE"
+fi
+
+BACKEND_PORT="${MIMIKA_BACKEND_PORT:-7693}"
+PYTHON_BIN="$SCRIPT_DIR/venv/bin/python3"
+[ -x "$PYTHON_BIN" ] || { echo "Bundled Python not found" >&2; exit 1; }
+
+# Resolve bundled site-packages dynamically
+SITE_PACKAGES_DIR=""
+for candidate in "$SCRIPT_DIR"/venv/lib/python*/site-packages; do
+    if [ -d "$candidate" ]; then
+        SITE_PACKAGES_DIR="$candidate"
+        break
+    fi
+done
+[ -n "$SITE_PACKAGES_DIR" ] || { echo "site-packages not found" >&2; exit 1; }
+
+# Environment configuration
+export PYTHONUNBUFFERED=1
+export PYTHONPYCACHEPREFIX="$APP_CACHE_DIR/pycache"
+export XDG_CACHE_HOME="$APP_CACHE_DIR"
+export MIMIKA_RUNTIME_HOME="$APP_SUPPORT_DIR"
+export MIMIKA_DATA_DIR="$APP_SUPPORT_DIR/data"
+export MIMIKA_LOG_DIR="$APP_LOG_DIR"
+export MIMIKA_OUTPUT_DIR="$APP_SUPPORT_DIR/outputs"
+export HF_HOME="$APP_SUPPORT_DIR/huggingface"
+export HUGGINGFACE_HUB_CACHE="$HF_HOME/hub"
+export TRANSFORMERS_CACHE="$HUGGINGFACE_HUB_CACHE"
+export PYTHONPATH="$SCRIPT_DIR:$SITE_PACKAGES_DIR${PYTHONPATH:+:$PYTHONPATH}"
+
+mkdir -p "$MIMIKA_DATA_DIR" "$MIMIKA_OUTPUT_DIR" "$HUGGINGFACE_HUB_CACHE"
+
+cd "$SCRIPT_DIR"
+exec "$PYTHON_BIN" -m uvicorn main:app --host 127.0.0.1 --port "$BACKEND_PORT" >> "$LOG_FILE" 2>&1
+LAUNCHER
+chmod +x "$BUNDLED_BACKEND/run_backend.sh"
+```
+
+**Key environment variables for bundled apps:**
+
+| Variable | Purpose | Example Value |
+|----------|---------|---------------|
+| `PYTHONUNBUFFERED` | Immediate log output | `1` |
+| `PYTHONPYCACHEPREFIX` | Redirect __pycache__ to writable location | `~/Library/Caches/App/pycache` |
+| `XDG_CACHE_HOME` | General cache directory | `~/Library/Caches/App` |
+| `HF_HOME` | Hugging Face home (models) | `~/Library/Application Support/App/huggingface` |
+| `HUGGINGFACE_HUB_CACHE` | Model cache location | `$HF_HOME/hub` |
+| `PYTHONPATH` | Module search path | `backend:site-packages` |
+
+### Code Signing Bundled Binaries
+
+```bash
+log "Re-signing bundled runtime binaries..."
+while IFS= read -r candidate; do
+    [ -n "$candidate" ] || continue
+    is_macho_file "$candidate" || continue
+    codesign --force --sign - "$candidate" >/dev/null 2>&1 || true
+done < <(
+    {
+        find "$BUNDLED_PYTHON/bin" -maxdepth 1 -type f 2>/dev/null
+        find "$BUNDLED_PYTHON/lib" -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null
+        find "$BUNDLED_BACKEND/venv/bin" -maxdepth 1 -type f 2>/dev/null
+        find "$BUNDLED_BACKEND/venv/lib/$PYTHON_TAG/site-packages" \
+            -type f \( -name "*.so" -o -name "*.dylib" \) 2>/dev/null
+    } | sort -u
+)
+```
+
+The `--sign -` creates an ad-hoc signature. For distribution, replace with your Developer ID certificate.
+
+### Creating the DMG
+
+```bash
+DMG_NAME="$APP_NAME-$VERSION-$ARCH.dmg"
+DMG_PATH="$DIST_DIR/$DMG_NAME"
+
+log "Creating DMG: $DMG_NAME"
+rm -f "$DMG_PATH"
+
+# Prefer create-dmg for prettier results
+if command -v create-dmg >/dev/null 2>&1; then
+    create-dmg \
+        --volname "$APP_NAME" \
+        --window-pos 200 120 \
+        --window-size 700 430 \
+        --icon-size 100 \
+        --icon "$APP_NAME.app" 180 200 \
+        --app-drop-link 510 200 \
+        --hide-extension "$APP_NAME.app" \
+        "$DMG_PATH" \
+        "$DMG_STAGE_DIR" || {
+            # Fallback to hdiutil if create-dmg fails
+            log "create-dmg failed, falling back to hdiutil"
+            hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_STAGE_DIR" \
+                -ov -format UDZO "$DMG_PATH"
+        }
+else
+    log "create-dmg not found, using hdiutil"
+    hdiutil create -volname "$APP_NAME" -srcfolder "$DMG_STAGE_DIR" \
+        -ov -format UDZO "$DMG_PATH"
+fi
+```
+
+**Important:** The `hdiutil` fallback must package `$DMG_STAGE_DIR` (the whole staging directory), not just the `.app` bundle, to preserve the Applications symlink.
+
+#### Installing create-dmg
+
+```bash
+brew install create-dmg
+```
+
+#### create-dmg Options Reference
+
+| Option | Purpose |
+|--------|---------|
+| `--volname` | Volume name shown when mounted |
+| `--window-pos X Y` | Initial window position |
+| `--window-size W H` | Window dimensions |
+| `--icon-size N` | Icon size in pixels |
+| `--icon "Name.app" X Y` | Position of app icon |
+| `--app-drop-link X Y` | Position of Applications symlink |
+| `--hide-extension "Name.app"` | Hide .app extension |
+| `--background "image.png"` | Background image for DMG window |
+
+### Generating Release Artifacts
+
+```bash
+log "Generating SHA256..."
+cd "$DIST_DIR"
+shasum -a 256 "$DMG_NAME" > "$DMG_NAME.sha256"
+SHA256="$(awk '{print $1}' "$DMG_NAME.sha256")"
+
+# Copy release notes
+RELEASE_NOTES_SRC="$PROJECT_DIR/RELEASE_NOTES.md"
+RELEASE_NOTES_NAME="$APP_NAME-$VERSION-RELEASE_NOTES.md"
+if [ -f "$RELEASE_NOTES_SRC" ]; then
+    cp "$RELEASE_NOTES_SRC" "$DIST_DIR/$RELEASE_NOTES_NAME"
+    shasum -a 256 "$RELEASE_NOTES_NAME" > "$RELEASE_NOTES_NAME.sha256"
+fi
+
+# Create source archive from git
+SOURCE_ZIP_NAME="$APP_NAME-$VERSION-source.zip"
+if git -C "$PROJECT_DIR" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+    git -C "$PROJECT_DIR" archive \
+        --format=zip \
+        --prefix="$APP_NAME-$VERSION/" \
+        -o "$DIST_DIR/$SOURCE_ZIP_NAME" \
+        HEAD
+    shasum -a 256 "$SOURCE_ZIP_NAME" > "$SOURCE_ZIP_NAME.sha256"
+fi
+
+log ""
+log "=== Build Complete ==="
+log "DMG: $DMG_PATH"
+log "SHA256: $SHA256"
+```
+
+### Final dist/ Directory Structure
+
+```
+dist/
+├── MimikaStudio-2026.02.1-arm64.dmg
+├── MimikaStudio-2026.02.1-arm64.dmg.sha256
+├── MimikaStudio-2026.02.1-RELEASE_NOTES.md
+├── MimikaStudio-2026.02.1-RELEASE_NOTES.md.sha256
+├── MimikaStudio-2026.02.1-source.zip
+└── MimikaStudio-2026.02.1-source.zip.sha256
+```
+
+### App Bundle Final Structure
+
+```
+MimikaStudio.app/
+└── Contents/
+    ├── Info.plist
+    ├── MacOS/
+    │   └── MimikaStudio          # Flutter executable
+    └── Resources/
+        ├── backend/
+        │   ├── main.py           # FastAPI entry point
+        │   ├── version.py
+        │   ├── models/           # Model registry (*.py only)
+        │   ├── outputs/          # Empty directory
+        │   ├── run_backend.sh    # Launcher script
+        │   └── venv/
+        │       ├── bin/
+        │       │   ├── python3   # Real interpreter (copied, not symlinked)
+        │       │   ├── python -> python3
+        │       │   └── python3.11 -> python3
+        │       ├── lib/
+        │       │   └── python3.11/
+        │       │       └── site-packages/
+        │       │           ├── mlx/
+        │       │           ├── uvicorn/
+        │       │           └── ...
+        │       └── pyvenv.cfg    # Relative paths
+        ├── python/
+        │   ├── bin/
+        │   │   └── python3.11    # Bundled interpreter
+        │   └── lib/
+        │       ├── python3.11/   # Standard library
+        │       ├── libssl.3.dylib        # Vendored dylibs
+        │       ├── libcrypto.3.dylib
+        │       └── ...
+        ├── LICENSE
+        └── BINARY-LICENSE.txt
+```
+
+### Troubleshooting Common Issues
+
+| Issue | Symptom | Fix |
+|-------|---------|-----|
+| dyld: Library not loaded | App crashes on launch | Check `otool -L` output; ensure all deps are vendored |
+| Code signature invalid | Gatekeeper blocks app | Re-sign with `codesign --force --sign -` or Developer ID |
+| Python not found | Backend fails to start | Verify venv/bin/python3 is a real binary, not symlink |
+| Permission denied | Backend can't write logs | Use ~/Library paths, not app bundle paths |
+| Models not downloading | HF cache misconfigured | Set `HF_HOME` and `HUGGINGFACE_HUB_CACHE` env vars |
+| Missing Applications link | DMG lacks drag-install | Ensure hdiutil packages $DMG_STAGE_DIR, not just .app |
+| App translocation | App runs from random path | Use real binaries, not symlinks; sign properly |
+
+### hdiutil vs create-dmg Comparison
+
+| Feature | hdiutil | create-dmg |
+|---------|---------|------------|
+| Window layout | No | Yes |
+| Icon positioning | No | Yes |
+| Background image | Manual | Built-in |
+| Hide extensions | Manual | Built-in |
+| Install simplicity | Built-in | `brew install` |
+| Fallback reliability | High | May fail on edge cases |
+
+### Notarization (Production Release)
+
+For production releases, notarize after signing:
+
+```bash
+# Sign with Developer ID
+codesign --force --deep --sign "Developer ID Application: Your Name" "$APP_BUNDLE"
+
+# Create DMG
+# ... (as above)
+
+# Submit for notarization
+xcrun notarytool submit "$DMG_PATH" \
+    --apple-id "your@email.com" \
+    --team-id "TEAMID" \
+    --password "@keychain:AC_PASSWORD" \
+    --wait
+
+# Staple the ticket
+xcrun stapler staple "$DMG_PATH"
+```
+
+### Complete build_dmg.sh Template
+
+See the full reference implementation at:
+- `MimikaCODE/scripts/build_dmg.sh`
+
+Key characteristics:
+- ~520 lines of production-tested bash
+- Handles both arm64 and x86_64 builds
+- MLX-only pruning for smaller Apple Silicon bundles
+- Multi-pass Mach-O relocation for all transitive dependencies
+- Fallback from create-dmg to hdiutil
+- SHA256 hash generation for all artifacts
+- Source archive via git
+
 #### Project Scripts (Reference: flutter-python-fullstack pattern)
 - **Control script** (`bin/appctl`):
   - `appctl up` - Start all services
