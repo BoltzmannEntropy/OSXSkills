@@ -1,13 +1,13 @@
 ---
 name: osx-app-compliance-check
-description: Use when auditing macOS app projects for DMG creation, release infrastructure, versioning, and distribution compliance. Produces a report and optionally fixes missing components.
+description: Use when auditing macOS app projects for DMG creation, release infrastructure, versioning, distribution compliance, and close-window backend shutdown behavior. Produces a report and optionally fixes missing components.
 ---
 
 # macOS App Compliance Check
 
 ## Overview
 
-This skill audits all macOS app projects in the workspace for DMG creation scripts, release notes, automatic versioning, license files, and other distribution infrastructure. It produces a compliance report and can automatically fix missing components.
+This skill audits all macOS app projects in the workspace for DMG creation scripts, release notes, automatic versioning, GitHub release publication, website download-link integrity, model/documentation parity, and other distribution infrastructure. It produces a compliance report and can automatically fix missing components.
 
 **Related Skill:** For in-depth code review before App Store submission, see `app-store-code-review/SKILL.md`.
 
@@ -49,6 +49,7 @@ The skill automatically discovers all `*PRJ` directories in the workspace.
 | `README.md` | Project documentation | YES |
 | `install.sh` | Installation script | YES |
 | `issues.sh` | Diagnostic script | YES |
+| `scripts/release.sh` | End-to-end release automation | YES |
 
 ### 2. Build Script Features
 
@@ -82,6 +83,50 @@ Projects MUST have at least one version source:
 | `bin/appctl` or `bin/<app>ctl` | Service control (up/down/status/logs) |
 | `bin/<app>_mcp_server.py` | MCP server for Claude integration |
 
+### 5. Window-Close Backend Shutdown UX (Release Blocker)
+
+Desktop apps with bundled local backends MUST shut down the backend when the user closes the app window.
+
+| Requirement | Description | Check Pattern |
+|-------------|-------------|---------------|
+| **Exit interception** | App intercepts window close / app-exit request before terminating | `onExitRequested\|didRequestAppExit\|WindowListener` |
+| **Shutdown call** | Exit path calls backend stop logic | `stopBackend\|stop_server\|shutdown_backend` |
+| **Stopping dialog/UI** | Close path displays visible "Stopping server/backend" progress UI | `Stopping Server\|Stopping backend\|stop.*before exit` |
+| **No orphan backend** | Post-close check confirms backend port/process is gone | `lsof -iTCP` / process check in smoke test docs |
+
+### 6. GitHub Release + Website Sync (Release Blocker)
+
+Every DMG release must produce a real, populated GitHub release and matching website links.
+
+| Requirement | Description | Check Pattern |
+|-------------|-------------|---------------|
+| **Release automation** | `scripts/release.sh` creates/updates GitHub release and uploads assets | `gh release create\|gh release upload` |
+| **No empty releases** | Release page must contain assets (not tag-only) | `gh release view --json assets` |
+| **Required assets** | Release includes DMG, DMG SHA256, source ZIP, source ZIP SHA256, release notes, release notes SHA256 | `-arm64.dmg\|source.zip\|RELEASE_NOTES` |
+| **Direct DMG links** | Website download buttons/nav resolve directly to current DMG asset URL | `/releases/download/v.*/.*\\.dmg` |
+| **Version alignment** | Version badge/text, release tag, and artifact filenames match | `v[0-9]+\\.[0-9]+\\.[0-9]+` or project format |
+| **Gatekeeper instructions** | If unsigned/not notarized, release notes include explicit launch steps and security path | `Unsigned DMG.*Gatekeeper\|Open Anyway` |
+
+### 7. Documentation and Model-Catalog Parity (Release Blocker)
+
+| Requirement | Description | Check Pattern |
+|-------------|-------------|---------------|
+| **README model table complete** | README lists all app-shipped/supported model variants (including quantized aliases/namespaces where applicable) | `## Supported Models` |
+| **Website model table complete** | Website "Supported Models" mirrors README/app capability set | `Supported Models` in `<AppName>WEB` |
+| **Pregenerated samples indexed** | README includes pregenerated example index for shipped demos | `pregenerated` |
+| **Capability accuracy** | Marketing/docs do not claim unsupported capabilities (for example, cloning on non-cloning models) | manual diff vs runtime engines |
+| **First-run guidance present** | README/website include first-launch backend warm-up and model-download guidance | `startup log\|Download` |
+
+### 8. Clean-Machine First-Run Validation (Release Blocker)
+
+| Requirement | Description | Check Pattern |
+|-------------|-------------|---------------|
+| **No stale app collision** | Old copies in `/Applications` removed before smoke testing new DMG | manual check |
+| **No stale model cache assumption** | Validate first run with empty app-scoped cache/models | app-specific cache path check |
+| **Backend port conflict handling** | App surfaces clear "restart/stop conflicting process" path if port is in use | `port in use\|Restart Server` |
+| **Bundled PDF serving check** | `/api/pdf/list` and `/pdf/<file>` work from bundled build | health smoke test |
+| **Relative resource pathing** | Bundled backend uses app-relative/runtime paths, never source checkout paths | no hardcoded repo paths |
+
 ## Audit Procedure
 
 ### Step 1: Discover Projects
@@ -107,6 +152,7 @@ PROJECT_DIR="<path_to_CODE_directory>"
 [ -f "$PROJECT_DIR/README.md" ]
 [ -f "$PROJECT_DIR/install.sh" ]
 [ -f "$PROJECT_DIR/issues.sh" ]
+[ -f "$PROJECT_DIR/scripts/release.sh" ]
 
 # Build script features (if script exists)
 BUILD_SCRIPT="$PROJECT_DIR/scripts/build_dmg.sh"
@@ -116,6 +162,29 @@ grep -q 'create-dmg' "$BUILD_SCRIPT"       # create-dmg
 grep -q 'hdiutil' "$BUILD_SCRIPT"          # hdiutil fallback
 grep -qE 'LICENSE|BINARY-LICENSE' "$BUILD_SCRIPT"  # License embedding
 grep -q 'RELEASE_NOTES' "$BUILD_SCRIPT"    # Release notes copy
+
+# Release script checks
+RELEASE_SCRIPT="$PROJECT_DIR/scripts/release.sh"
+grep -q 'gh release create' "$RELEASE_SCRIPT"
+grep -q 'gh release upload' "$RELEASE_SCRIPT"
+grep -qE 'source\\.zip|RELEASE_NOTES' "$RELEASE_SCRIPT"
+
+# Window-close backend shutdown UX (Flutter desktop apps with local backend)
+MAIN_DART="$PROJECT_DIR/flutter_app/lib/main.dart"
+if [ -f "$MAIN_DART" ] && [ -d "$PROJECT_DIR/backend" ]; then
+  grep -qE 'onExitRequested|didRequestAppExit|WindowListener' "$MAIN_DART"
+  grep -qE 'stopBackend|stop_server|shutdown_backend' "$MAIN_DART"
+  grep -qE 'Stopping Server|Stopping backend' "$MAIN_DART"
+fi
+
+# Website direct-download link checks (if website repo exists)
+PROJECT_PARENT="$(dirname "$PROJECT_DIR")"
+PRJ_NAME="$(basename "$PROJECT_PARENT")"
+APP_PREFIX="${PRJ_NAME%PRJ}"
+WEBSITE_DIR="$PROJECT_PARENT/${APP_PREFIX}WEB"
+if [ -d "$WEBSITE_DIR" ]; then
+  rg -n '/releases/download/.+\\.dmg' "$WEBSITE_DIR"/*.html
+fi
 ```
 
 ### Step 3: Generate Report
@@ -152,6 +221,22 @@ Output format:
 - [ ] Auto version extraction (MISSING)
 - ...
 
+#### Window-Close Backend Shutdown UX
+- [x] Exit interception implemented
+- [x] Backend stop invoked during close
+- [x] Stopping dialog shown during close
+- [ ] No orphan backend validation documented (MISSING)
+
+#### GitHub Release + Website Sync
+- [x] release.sh automates release upload
+- [ ] Release assets incomplete (MISSING SOURCE ZIP SHA)
+- [ ] Website download button points to non-DMG URL (MISSING)
+
+#### Documentation and Model-Catalog Parity
+- [x] README has Supported Models section
+- [ ] Website model table missing variants (MISSING)
+- [ ] Pregenerated sample index incomplete (MISSING)
+
 #### Issues Found
 1. Missing RELEASE_NOTES.md
 2. Build script lacks auto version extraction
@@ -162,6 +247,42 @@ Output format:
 ```
 
 ## Fix Templates
+
+### Flutter Window-Close Backend Shutdown Pattern
+
+For Flutter desktop apps with a bundled backend, add an exit-request hook that blocks immediate app termination, shows a stopping dialog, stops backend, then exits:
+
+```dart
+AppLifecycleListener? _appLifecycleListener;
+bool _allowImmediateExit = false;
+bool _isShuttingDown = false;
+
+@override
+void initState() {
+  super.initState();
+  _appLifecycleListener = AppLifecycleListener(
+    onExitRequested: _handleExitRequested,
+  );
+}
+
+Future<AppExitResponse> _handleExitRequested() async {
+  if (_allowImmediateExit) return AppExitResponse.exit;
+  if (_isShuttingDown) return AppExitResponse.cancel;
+  _isShuttingDown = true;
+  _showStoppingDialog();
+  await backendService.stopBackend();
+  _allowImmediateExit = true;
+  await SystemNavigator.pop();
+  return AppExitResponse.cancel;
+}
+```
+
+Also add a smoke test step:
+
+- Launch app from `/Applications`
+- Close window
+- Confirm stopping dialog appears
+- Confirm backend process/port is gone (`lsof -iTCP:<port> -sTCP:LISTEN`)
 
 ### RELEASE_NOTES.md Template
 
@@ -194,6 +315,18 @@ Output format:
 1. Download `<AppName>-1.0.0-macos.dmg`
 2. Open the DMG and drag <AppName> to Applications
 3. On first launch, right-click and select "Open" (Gatekeeper bypass)
+
+## Unsigned DMG (Apple Gatekeeper)
+
+As of <Month DD, YYYY>, the <AppName> DMG is not yet signed/notarized by Apple.
+macOS may block first launch until you explicitly allow it in security settings.
+
+1. Open the DMG and drag <AppName>.app to Applications.
+2. In Applications, right-click <AppName>.app and select Open.
+3. Click Open in the warning dialog.
+4. If macOS still blocks launch, go to: System Settings -> Privacy & Security -> Open Anyway (for <AppName>), then confirm with password/Touch ID.
+5. On first launch, wait for the bundled backend to start. A startup-log screen for a few seconds is expected.
+6. On first use, click Download for any required model in the in-app model card.
 
 ## Checksums
 
@@ -300,6 +433,37 @@ if [ -f "$RELEASE_NOTES_SRC" ]; then
     ok "Release notes copied"
 fi
 ```
+
+### Release Script GitHub Publish Pattern
+
+`scripts/release.sh` should create or update the release and upload all required assets every time:
+
+```bash
+TAG="v$VERSION"
+TITLE="$APP_NAME $VERSION"
+NOTES_FILE="$ROOT_DIR/RELEASE_NOTES.md"
+
+DMG_PATH="$DIST_DIR/${APP_NAME}-${VERSION}-arm64.dmg"
+DMG_SHA_PATH="$DMG_PATH.sha256"
+SRC_ZIP_PATH="$DIST_DIR/${APP_NAME}-${VERSION}-source.zip"
+SRC_SHA_PATH="$SRC_ZIP_PATH.sha256"
+RN_PATH="$DIST_DIR/${APP_NAME}-${VERSION}-RELEASE_NOTES.md"
+RN_SHA_PATH="$RN_PATH.sha256"
+
+if ! gh release view "$TAG" >/dev/null 2>&1; then
+  gh release create "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE" --latest
+else
+  gh release edit "$TAG" --title "$TITLE" --notes-file "$NOTES_FILE"
+fi
+
+gh release upload "$TAG" \
+  "$DMG_PATH" "$DMG_SHA_PATH" \
+  "$SRC_ZIP_PATH" "$SRC_SHA_PATH" \
+  "$RN_PATH" "$RN_SHA_PATH" \
+  --clobber
+```
+
+Minimum publish rule: release is FAIL if the tag exists but assets are empty.
 
 ### Build Script License Embedding
 

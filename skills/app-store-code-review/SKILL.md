@@ -85,6 +85,8 @@ digraph review_flow {
 - [ ] **Backend check**: Health check on startup with loading/disconnected states
 - [ ] **Bundled backend autostart**: If backend is down and app is bundled, UI attempts backend startup automatically (no manual CLI prerequisite for end users)
 - [ ] **Startup status UX**: UI shows backend startup progress/status (for example: starting/waiting/failed)
+- [ ] **Exit shutdown hook**: App intercepts desktop window-close/exit requests and runs graceful backend shutdown before process exit
+- [ ] **Shutdown UX**: During close, app shows a blocking "Stopping server/backend..." progress dialog until shutdown finishes or timeout path is handled
 - [ ] **Production messaging**: Disconnected-state copy does not instruct end users to run terminal commands
 - [ ] **Stats polling**: Uses `Future.doWhile()` with `mounted` guard
 - [ ] **Status chips**: Color-coded (green/orange/red) using `withValues(alpha:)`
@@ -247,12 +249,15 @@ digraph review_flow {
 - [ ] `hdiutil` fallback packages the DMG staging directory (not only the `.app`) so Applications symlink survives fallback builds
 - [ ] Code signing for DMG distribution
 - [ ] Notarization of DMG for Gatekeeper
+- [ ] If DMG is unsigned, release notes + README + website include explicit Gatekeeper bypass steps with concrete date and `Open Anyway` path
 - [ ] Volume name and window layout configured
 - [ ] SHA256 hash generated alongside DMG (`.dmg.sha256`)
 - [ ] Version extracted from centralized version file
 - [ ] DMG root includes `LICENSE` (source) and `BINARY-LICENSE.txt` (binary/EULA)
 - [ ] App bundle embeds `Contents/Resources/LICENSE` and `Contents/Resources/BINARY-LICENSE.txt`
 - [ ] DMG license agreement configured (when supported by the DMG toolchain)
+- [ ] Bundled-app smoke test validates `GET /api/health`, `GET /api/pdf/list`, and direct `GET /pdf/<bundled-file>` after launch from `/Applications`
+- [ ] Bundled PDF/runtime assets resolve via app-relative paths (no hardcoded source checkout paths)
 
 ### Bundled Python Backend (Mandatory for macOS Desktop Distribution)
 - [ ] Backend process is launched by the app itself on first run (no terminal dependency for end users)
@@ -262,7 +267,11 @@ digraph review_flow {
 - [ ] Backend does not require writing launcher logs into app bundle directories
 - [ ] Backend model/cache env vars are set for app-scoped storage (`HF_HOME`, `HUGGINGFACE_HUB_CACHE`, `TRANSFORMERS_CACHE`)
 - [ ] Backend health check retries include clear startup status and failure state
+- [ ] First-launch UI includes explicit startup/waiting log state while bundled backend warms up
+- [ ] Disconnected-state primary action is a user-safe restart flow (for example `Restart Server`) and avoids shell-command instructions
+- [ ] Backend port-conflict path is handled explicitly (detect in-use port, prompt/confirm stop conflicting process, then retry)
 - [ ] First-run behavior tested with no existing localhost backend process running
+- [ ] Closing the app window must terminate bundled backend child processes (no orphan backend after UI exit)
 
 ### Project Scripts (Reference: flutter-python-fullstack pattern)
 - [ ] **Control script** (`bin/appctl`):
@@ -294,8 +303,10 @@ Every macOS app MUST have a `scripts/release.sh` that automates the full release
 - [ ] Script supports `--upload` flag for GitHub release upload
 - [ ] Script supports `--sync-website` flag for website download link updates
 - [ ] Script generates SHA256 checksum alongside DMG
-- [ ] Script creates GitHub release as DRAFT (not auto-published)
+- [ ] Script creates or updates GitHub release for the current tag (never leave tag-only/empty release pages)
+- [ ] Script uploads full asset set: DMG + DMG SHA256 + source ZIP + source ZIP SHA256 + release notes + release notes SHA256
 - [ ] Script updates website download URLs with new version
+- [ ] Script updates website download URLs to direct DMG asset links (not generic release listing pages)
 - [ ] Script commits and pushes website changes automatically
 - [ ] Script provides clear success/failure output with colored status
 
@@ -361,12 +372,13 @@ fi
 2. [ ] Update version in `pubspec.yaml` if needed
 3. [ ] Run `./scripts/release.sh --upload --sync-website`
 4. [ ] Verify DMG created and checksum generated
-5. [ ] Verify GitHub release created as draft
-6. [ ] Verify release assets uploaded (DMG + SHA256)
-7. [ ] Verify website download links updated
-8. [ ] Verify website changes committed and pushed
-9. [ ] Test DMG download from GitHub release page
-10. [ ] Publish GitHub release (remove draft status)
+5. [ ] Verify GitHub release exists for the tag and is not empty
+6. [ ] Verify release assets uploaded (DMG, DMG SHA256, source ZIP, source ZIP SHA256, release notes, release notes SHA256)
+7. [ ] If unsigned/not notarized, verify release notes include the Gatekeeper section with current date and launch steps
+8. [ ] Verify website download links updated and point directly to current DMG asset URL
+9. [ ] Verify website changes committed and pushed
+10. [ ] Test DMG direct-download URL (for example with `curl -I -L`) and confirm HTTP 200
+11. [ ] Run fresh-user smoke test (no old app in `/Applications`, no pre-downloaded model cache assumptions)
 
 #### Release Script Red Flags
 | Issue | Pattern | Fix |
@@ -376,7 +388,9 @@ fi
 | No --upload flag | Separate manual upload | Add GitHub release upload |
 | No --sync-website | Manual website edit | Add website URL update |
 | No checksum | DMG only | Generate `.sha256` file |
-| Auto-publish | Non-draft release | Create as `--draft` |
+| Empty release page | Tag exists but no assets | Enforce upload of full asset set in `release.sh` |
+| Missing source/notes artifacts | DMG uploaded without source zip/release notes checksums | Upload source ZIP + notes + both SHA256 files |
+| Non-direct download links | Website points to generic `/releases` page | Point website CTAs to `/releases/download/<tag>/<asset>.dmg` |
 | No website commit | Website not updated | Auto-commit and push |
 | Version reuse | Same tag twice | Always increment version |
 
@@ -877,9 +891,13 @@ class _McpPageState extends State<McpPage> {
 - [ ] Link `Open Source` labels in website hero/meta rows to `license.html` (not plain text).
 - [ ] In website hero badges/benefits, remove `Lifetime Updates` and avoid reintroducing it in future copy revisions.
 - [ ] Add a primary `Download for macOS` CTA on the left hero column before `Get Started` / `View on GitHub` style links.
+- [ ] Primary nav `Download` and hero `Download` CTA both point directly to the current DMG asset URL for the latest tag.
 - [ ] Ensure each macOS app site under `<AppName>WEB` uses the same wording pattern (only app name varies).
 - [ ] Verify `<AppName>CODE/LICENSE`, `<AppName>CODE/BINARY-LICENSE.txt`, and `<AppName>WEB/license.html` all exist and are mutually consistent.
 - [ ] In multi-repo updates, stage and commit only intended files from `<AppName>CODE` and `<AppName>WEB` when worktrees are already dirty.
+- [ ] Keep `README.md` and website `Supported Models` tables fully synchronized with the app's runtime model registry (include aliases, quantized variants, and namespace-specific surfaces like CosyVoice/Supertonic when present).
+- [ ] Keep README pregenerated-example index synchronized with shipped files in `backend/data/pregenerated` (no missing demos).
+- [ ] If DMG is unsigned/not notarized, publish matching Gatekeeper bypass instructions in both README and website install docs.
 
 ### Website Privacy Consent Popup (Mandatory Across All App Sites)
 - [ ] Every app website in `<AppName>WEB` includes a GDPR consent popup script at `<AppName>WEB/privacy-consent.js`.
@@ -929,6 +947,8 @@ class _McpPageState extends State<McpPage> {
 - [ ] Verify first-run model status is clean for a fresh macOS user profile
 - [ ] Verify model download/delete works and persists across relaunch
 - [ ] Verify behavior when another process is already listening on backend port
+- [ ] Close the app window and verify a visible "Stopping server/backend..." shutdown dialog appears before exit
+- [ ] After close, verify backend process/port is no longer running (`lsof -iTCP:<port> -sTCP:LISTEN` shows nothing for the app backend)
 - [ ] Repeat smoke test on a fresh account or clean-home environment before release tag
 
 ### Settings Screen
@@ -1384,6 +1404,7 @@ After review, offer to fix issues:
 - Author not set to Qneura.ai
 - No accessibility testing done
 - Bundled app does not auto-start backend, or UI tells users to run terminal commands
+- Closing the app window leaves backend process running, or app exits without showing shutdown progress UI
 - Runtime writes/logs/database under `.app/Contents` or mounted `.dmg`
 - DMG built via fallback path but missing `Applications` drag target
 - `hdiutil` fallback packages only `.app` instead of DMG staging folder

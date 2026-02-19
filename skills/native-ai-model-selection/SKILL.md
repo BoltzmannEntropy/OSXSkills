@@ -17,6 +17,13 @@ This skill guides selection of native (non-Python) AI models for macOS applicati
 - Building DMG-distributable apps with embedded AI
 - Selecting between ONNX, CoreML, and MLX frameworks
 
+## Documentation Parity Rules (Mandatory for Release)
+
+- Keep runtime model registry, README `Supported Models`, and website model tables synchronized before every release.
+- Include quantized variants, aliases, and namespace-specific surfaces (for example, CosyVoice namespace backed by another engine) explicitly.
+- Do not market unsupported capabilities (for example, "voice cloning" on non-cloning engines).
+- Keep pregenerated demo/sample indexes in README aligned with files actually shipped in `backend/data/pregenerated`.
+
 ## Framework Decision Matrix
 
 ```dot
