@@ -1,5 +1,5 @@
 ---
-name: app-store-code-review
+name: osx-review
 description: Use when preparing mobile/desktop apps for App Store submission, before final release, or when user mentions App Store, production readiness, shipping, or needs comprehensive quality review for distribution
 ---
 
@@ -33,6 +33,16 @@ Do not create or update app sites in `artifacts/all-web` for these macOS apps.
 - When user says "ship", "release", "production ready", "App Store"
 - After major feature completion
 - When reviewing cross-platform apps (Flutter, React Native, etc.)
+
+## iOS/iPad Baseline (Current)
+
+For iOS/iPad submissions, enforce these before final sign-off:
+
+- [ ] Run `bash ./skills/osx-ios/scripts/check_ios_dist.sh --app-root <APP_ROOT>` and resolve all `FAIL` findings
+- [ ] Archive/upload baseline matches current App Store Connect tooling requirements
+- [ ] TestFlight constraints checked (tester caps, build age, beta review flow)
+- [ ] Screenshot coverage satisfies current iPhone + iPad minimum requirements
+- [ ] Privacy manifest and required-reason API declarations validated
 
 ## Review Categories
 
@@ -223,12 +233,16 @@ digraph review_flow {
 
 ### Apple App Store
 - [ ] Privacy manifest (PrivacyInfo.xcprivacy) present
+- [ ] Required-reason API declarations and third-party SDK manifests validated
 - [ ] Required device capabilities declared
 - [ ] App Transport Security configured
 - [ ] No private API usage
 - [ ] Proper entitlements configured
 - [ ] App icons all sizes present
 - [ ] Launch screen configured
+- [ ] Build uploaded with current supported Xcode/SDK baseline
+- [ ] TestFlight readiness verified (internal/external path + beta review expectations)
+- [ ] iPhone and iPad screenshot requirements satisfied for enabled device families
 
 ### Google Play
 - [ ] Target SDK meets requirements

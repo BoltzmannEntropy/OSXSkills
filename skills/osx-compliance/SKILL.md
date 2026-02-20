@@ -1,22 +1,38 @@
 ---
-name: osx-app-compliance-check
-description: Use when auditing macOS app projects for DMG creation, release infrastructure, versioning, distribution compliance, and close-window backend shutdown behavior. Produces a report and optionally fixes missing components.
+name: osx-compliance
+description: Use when auditing Apple-platform app projects for release infrastructure and distribution compliance. Covers macOS DMG readiness and iOS/iPad App Store Connect release gates via companion checks.
 ---
 
-# macOS App Compliance Check
+# Apple Platform Compliance Check
 
 ## Overview
 
-This skill audits all macOS app projects in the workspace for DMG creation scripts, release notes, automatic versioning, GitHub release publication, website download-link integrity, model/documentation parity, and other distribution infrastructure. It produces a compliance report and can automatically fix missing components.
+This skill audits Apple-platform app projects in the workspace for release infrastructure, versioning, publication hygiene, website/download integrity, model/documentation parity, and distribution blockers.
 
-**Related Skill:** For in-depth code review before App Store submission, see `app-store-code-review/SKILL.md`.
+Primary focus:
+- macOS desktop distribution (`.dmg`) infrastructure
+- iOS/iPad distribution (`.ipa` + App Store Connect/TestFlight) preflight delegation
+
+**Related Skills:**
+- For in-depth code review before App Store submission, see `osx-review/SKILL.md`.
+- For iOS/iPad upload/submission checks, see `osx-ios/SKILL.md`.
 
 ## When to Use
 
-- Before releasing a new version of any macOS app
+- Before releasing a new version of any macOS, iOS, or iPad app
 - When setting up a new macOS app project
 - Periodic compliance audits across all projects
 - After major infrastructure changes to verify consistency
+
+## iOS/iPad Companion Gate
+
+If a project contains an iOS target, this skill MUST require a passed `osx-ios` preflight:
+
+```bash
+bash ./skills/osx-ios/scripts/check_ios_dist.sh --app-root <APP_ROOT>
+```
+
+Treat any `FAIL` result as release-blocking before TestFlight/App Store actions.
 
 ## Project Discovery
 
@@ -527,7 +543,7 @@ See the DMG Creation section in the main README for complete implementation deta
 
 ## Cross-Reference
 
-After running this compliance check, consider running **app-store-code-review** skill for:
+After running this compliance check, consider running **osx-review** skill for:
 
 - Crash prevention analysis
 - Resource management review

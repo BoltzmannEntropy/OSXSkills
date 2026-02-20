@@ -1,18 +1,20 @@
 # OSX Skills for Claude and Codex
 
-Production skills for reviewing and shipping macOS applications.
+Production skills for reviewing and shipping Apple platform applications (macOS + iOS/iPadOS).
 
 ## Included Skills
 
-- `osx-app-compliance-check`: audits macOS project release/compliance infrastructure.
-- `app-store-code-review`: deep release-focused code review for App Store and desktop delivery.
-- `native-ai-model-selection`: model/framework selection guidance for native macOS AI features.
+- `osx-compliance`: audits Apple-platform release/compliance infrastructure (macOS + iOS/iPad companion gates).
+- `osx-review`: deep release-focused code review for App Store and desktop/mobile delivery.
+- `osx-models`: model/framework selection guidance for native Apple-platform AI features.
+- `osx-ios`: end-to-end iOS/iPad distribution preparation for TestFlight and App Store.
 
 Skill source files:
 
-- `skills/osx-app-compliance-check/SKILL.md`
-- `skills/app-store-code-review/SKILL.md`
-- `skills/native-ai-model-selection/SKILL.md`
+- `skills/osx-compliance/SKILL.md`
+- `skills/osx-review/SKILL.md`
+- `skills/osx-models/SKILL.md`
+- `skills/osx-ios/SKILL.md`
 
 ## Installation
 
@@ -65,7 +67,13 @@ ln -sfn "$(pwd)/skills" ~/.agents/skills/osxskills
 Invoke directly, for example:
 
 ```text
-/app-store-code-review
+/osx-review
+```
+
+Or for mobile distribution:
+
+```text
+/osx-ios
 ```
 
 ### Codex
@@ -73,7 +81,13 @@ Invoke directly, for example:
 Use natural language, for example:
 
 ```text
-Use the app-store-code-review skill on this macOS app before release.
+Use the osx-review skill on this macOS app before release.
+```
+
+Or:
+
+```text
+Use the osx-ios skill to prepare iOS and iPad distribution for TestFlight.
 ```
 
 ## Update
