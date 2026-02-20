@@ -321,7 +321,7 @@ if [[ "$FAIL_COUNT" -eq 0 ]]; then
 fi
 
 # Privacy manifests (bash 3 compatible; avoid mapfile)
-manifests_raw="$(find "$APP_ROOT" -maxdepth 7 -type f -name PrivacyInfo.xcprivacy 2>/dev/null || true)"
+manifests_raw="$(find "$APP_ROOT" -maxdepth 7 -type f -name PrivacyInfo.xcprivacy ! -path "*/build/*" ! -path "*/.dart_tool/*" 2>/dev/null || true)"
 if [[ -z "$manifests_raw" ]]; then
   say_warn "No PrivacyInfo.xcprivacy found"
 else

@@ -1,0 +1,4 @@
+interface:
+  display_name: "Windows Flutter EXE"
+  short_description: "Build and package Flutter Windows executable with dependencies"
+  default_prompt: "Prepare a Flutter Windows app release package that includes all required runtime dependencies."
