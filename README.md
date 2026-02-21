@@ -8,6 +8,7 @@ Production skills for reviewing and shipping Apple platform applications (macOS 
 - `osx-review`: deep release-focused code review for App Store and desktop/mobile delivery.
 - `osx-models`: model/framework selection guidance for native Apple-platform AI features.
 - `osx-ios`: end-to-end iOS/iPad distribution preparation for TestFlight and App Store.
+- `osx-flutter-auth0-login`: Auth0 login implementation for Flutter macOS apps with PKCE, Keychain storage, and backend JWT verification.
 - `windows-flutter-exe`: builds and packages Flutter Windows executable bundles with runtime dependencies.
 
 Skill source files:
@@ -16,6 +17,7 @@ Skill source files:
 - `skills/osx-review/SKILL.md`
 - `skills/osx-models/SKILL.md`
 - `skills/osx-ios/SKILL.md`
+- `skills/osx-flutter-auth0-login/SKILL.md`
 - `skills/windows-flutter-exe/SKILL.md`
 
 ## Installation
@@ -84,6 +86,12 @@ Or for Flutter Windows executable packaging:
 /windows-flutter-exe
 ```
 
+Or for Auth0 login in Flutter macOS:
+
+```text
+/osx-flutter-auth0-login
+```
+
 ### Codex
 
 Use natural language, for example:
@@ -102,6 +110,12 @@ Or:
 
 ```text
 Use the windows-flutter-exe skill to package a Flutter Windows release with all dependencies.
+```
+
+Or:
+
+```text
+Use the osx-flutter-auth0-login skill to add Auth0 login to my Flutter macOS app.
 ```
 
 ## Update
