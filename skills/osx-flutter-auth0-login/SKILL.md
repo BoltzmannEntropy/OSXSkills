@@ -72,8 +72,8 @@ Example:
 
 ```yaml
 dependencies:
-  auth0_flutter: ^latest
-  flutter_secure_storage: ^latest
+  auth0_flutter: ^1.7.0
+  flutter_secure_storage: ^9.0.0
 ```
 
 Auth0 provides a Flutter quickstart and the pub.dev package documents macOS support and callback behavior.
@@ -109,6 +109,26 @@ Redirect URI becomes:
 Logout return URI becomes:
 
 - com.example.myapp://logout
+
+## macOS Entitlements (Keychain Access)
+
+For flutter_secure_storage to work in sandboxed macOS apps, configure Keychain entitlements.
+
+In `macos/Runner/Release.entitlements` and `macos/Runner/DebugProfile.entitlements`:
+
+```xml
+<key>keychain-access-groups</key>
+<array>
+  <string>$(AppIdentifierPrefix)com.example.myapp</string>
+</array>
+```
+
+If the app is sandboxed (required for App Store), also ensure:
+
+```xml
+<key>com.apple.security.app-sandbox</key>
+<true/>
+```
 
 ## App Configuration Model
 
@@ -229,6 +249,39 @@ class AuthService {
     return storage.read(key: 'auth.accessToken');
   }
 
+  /// Returns a valid access token, refreshing if needed.
+  /// Returns null if no valid token and refresh fails (re-login required).
+  Future<String?> getValidAccessToken() async {
+    final expiresAtStr = await storage.read(key: 'auth.expiresAt');
+    if (expiresAtStr != null) {
+      final expiresAt = DateTime.tryParse(expiresAtStr);
+      // Return cached token if still valid with 5-minute buffer
+      if (expiresAt != null && expiresAt.isAfter(DateTime.now().add(const Duration(minutes: 5)))) {
+        return storage.read(key: 'auth.accessToken');
+      }
+    }
+    // Token expired or expiring soon - attempt refresh
+    final refreshToken = await storage.read(key: 'auth.refreshToken');
+    if (refreshToken != null) {
+      try {
+        final credentials = await auth0.api.renewCredentials(refreshToken: refreshToken);
+        await _persist(credentials);
+        return credentials.accessToken;
+      } catch (_) {
+        // Refresh failed, clear tokens
+        await _clear();
+        return null;
+      }
+    }
+    return null;
+  }
+
+  /// Check if user has a valid session (for app startup routing).
+  Future<bool> isLoggedIn() async {
+    final token = await getValidAccessToken();
+    return token != null;
+  }
+
   Future<void> _persist(Credentials c) async {
     if (c.accessToken != null) {
       await storage.write(key: 'auth.accessToken', value: c.accessToken);
@@ -254,6 +307,41 @@ class AuthService {
 ```
 
 Note: Adjust API calls to match the exact auth0_flutter API version in the repo.
+
+### Alternative: Using Built-in CredentialsManager
+
+The auth0_flutter SDK includes a `CredentialsManager` that handles secure storage and refresh automatically. This is simpler but offers less control:
+
+```dart
+import 'package:auth0_flutter/auth0_flutter.dart';
+
+class AuthServiceSimple {
+  final Auth0 auth0;
+  final CredentialsManager credentialsManager;
+
+  AuthServiceSimple({required String domain, required String clientId})
+      : auth0 = Auth0(domain, clientId),
+        credentialsManager = CredentialsManager(Auth0(domain, clientId));
+
+  Future<Credentials> login({required String redirectUri, required String audience}) async {
+    final credentials = await auth0.webAuthentication(scheme: Uri.parse(redirectUri).scheme)
+        .login(redirectUrl: redirectUri, audience: audience, scopes: ['openid', 'profile', 'email', 'offline_access']);
+    await credentialsManager.storeCredentials(credentials);
+    return credentials;
+  }
+
+  Future<bool> isLoggedIn() => credentialsManager.hasValidCredentials();
+
+  Future<Credentials> getCredentials() => credentialsManager.credentials();
+
+  Future<void> logout({required String logoutUri}) async {
+    await auth0.webAuthentication(scheme: Uri.parse(logoutUri).scheme).logout(returnToUrl: logoutUri);
+    await credentialsManager.clearCredentials();
+  }
+}
+```
+
+Choose the manual approach (above) for full control over storage keys and error handling, or `CredentialsManager` for simplicity.
 
 ## Flutter macOS Login Screen (UI)
 
@@ -395,12 +483,75 @@ Backend must:
 
 This follows standard Auth0 guidance for calling APIs with access tokens.
 
-Minimal sketch (choose your jwt lib in your stack):
+### FastAPI Implementation
 
-- Middleware extracts Authorization header
-- Verify token
-- Attach claims to request context
-- Enforce scopes per route
+```python
+from fastapi import Depends, HTTPException, Security
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+import jwt
+from jwt import PyJWKClient
+from functools import lru_cache
+
+# Configuration - use environment variables in production
+AUTH0_DOMAIN = "your-tenant.us.auth0.com"
+API_AUDIENCE = "https://api.example.com"
+
+security = HTTPBearer()
+
+@lru_cache()
+def get_jwks_client():
+    return PyJWKClient(f"https://{AUTH0_DOMAIN}/.well-known/jwks.json")
+
+async def verify_token(
+    credentials: HTTPAuthorizationCredentials = Security(security)
+) -> dict:
+    """Validate Auth0 access token and return claims."""
+    token = credentials.credentials
+    try:
+        jwks_client = get_jwks_client()
+        signing_key = jwks_client.get_signing_key_from_jwt(token)
+        payload = jwt.decode(
+            token,
+            signing_key.key,
+            algorithms=["RS256"],
+            audience=API_AUDIENCE,
+            issuer=f"https://{AUTH0_DOMAIN}/"
+        )
+        return payload
+    except jwt.ExpiredSignatureError:
+        raise HTTPException(status_code=401, detail="Token expired")
+    except jwt.InvalidAudienceError:
+        raise HTTPException(status_code=401, detail="Invalid audience")
+    except jwt.InvalidIssuerError:
+        raise HTTPException(status_code=401, detail="Invalid issuer")
+    except jwt.exceptions.InvalidTokenError as e:
+        raise HTTPException(status_code=401, detail=f"Invalid token: {e}")
+
+def require_scope(required_scope: str):
+    """Dependency to enforce a specific scope."""
+    async def check_scope(claims: dict = Depends(verify_token)):
+        scopes = claims.get("scope", "").split()
+        if required_scope not in scopes:
+            raise HTTPException(status_code=403, detail=f"Missing scope: {required_scope}")
+        return claims
+    return check_scope
+
+# Usage in routes:
+# @app.get("/protected")
+# async def protected_route(claims: dict = Depends(verify_token)):
+#     return {"user": claims["sub"]}
+#
+# @app.post("/admin")
+# async def admin_route(claims: dict = Depends(require_scope("admin:write"))):
+#     return {"admin": True}
+```
+
+Requirements:
+
+```
+PyJWT>=2.8.0
+cryptography>=41.0.0
+```
 
 Also ensure:
 
