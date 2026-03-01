@@ -10,6 +10,7 @@ description: Use when preparing mobile/desktop apps for App Store submission, be
 Systematic code review process for applications targeting Apple App Store, Google Play, or desktop distribution. Identifies crash risks, security vulnerabilities, resource leaks, and compliance issues that cause rejection or poor user experience.
 
 This skill now includes a mandatory cross-repo consistency pass for macOS app websites + README licensing language before release.
+This skill also enforces MimikaCODE production UX baselines (system logs, queue/history/models/settings/file-path surfaces) for both existing projects and newly created projects.
 
 ## Repository Layout (Mandatory in This Workspace)
 
@@ -107,6 +108,10 @@ digraph review_flow {
 - [ ] **Footer log console**: App includes a footer system-log area that is collapsible and resizable
 - [ ] **Footer parity**: Footer log area also provides copy/export actions without navigating to settings
 - [ ] **Log export surface**: Backend provides a plain-text system log export endpoint (separate from full diagnostics bundle)
+- [ ] **Job Queue surface**: App has a visible job queue with live per-job status (`queued`, `running`, `done`/`failed`)
+- [ ] **Persistent Job History**: Job history persists across app restarts with metadata (timestamp, model, duration, status, output artifact)
+- [ ] **Jobs History playback**: App has a jobs-history UI page that supports playback/opening generated outputs where applicable
+- [ ] **File path visibility**: Generation results and history rows show full output file paths with an `Open Folder`/`Reveal in Finder` action
 
 ### iOS/Swift
 - [ ] No force unwraps (`!`) on optionals from external data
@@ -967,6 +972,8 @@ class _McpPageState extends State<McpPage> {
 
 ### Settings Screen
 - [ ] Output folder selection (with folder picker)
+- [ ] System folders panel displays effective runtime paths (Application Support, Logs, Cache, Models, Outputs)
+- [ ] Output folder setting is persisted and used by generation + history screens
 - [ ] Theme preference (Light/Dark/System)
 - [ ] Clear cache option
 - [ ] Reset to defaults option
@@ -979,6 +986,14 @@ class _McpPageState extends State<McpPage> {
 - [ ] Activation flow records licensing metadata (`license_provider=polar|lemonsqueezy`, activation timestamp).
 - [ ] Backend connection status indicator
 - [ ] Model/engine management (if applicable)
+
+### Models + Jobs Surfaces (Mandatory)
+- [ ] Models page exists and lists model names with local model paths
+- [ ] Models page shows model download status (`not downloaded`/`downloading`/`ready`/`error`)
+- [ ] Models page shows per-model disk usage and total model-storage usage
+- [ ] Jobs History page exists as a dedicated screen (not only transient toast/list in generation page)
+- [ ] Jobs History includes key metadata columns (created time, model/engine, duration, status, output path)
+- [ ] Jobs History supports playback/open action for generated media and open-in-folder/reveal actions
 
 ### Trial + Licensing Rationale (Required)
 - [ ] The app must surface trial state in-product so users understand remaining evaluation time without contacting support.
