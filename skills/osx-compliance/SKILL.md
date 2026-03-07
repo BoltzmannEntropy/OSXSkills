@@ -151,11 +151,12 @@ Apply these checks to both existing apps and newly created apps.
 
 | Requirement | Description | Check Pattern |
 |-------------|-------------|---------------|
-| **Job Queue UI** | Background generation/processing queue with live status transitions (`queued`, `running`, `done`/`failed`) | `Job Queue\|queued\|running\|completed\|failed` |
-| **Persistent Job History** | Durable history of all jobs with core metadata (timestamps, model, duration/status, output info) | `Job History\|generation history\|created_at\|duration\|status\|model` |
+| **Job Queue UI** | Background queue with live status transitions (`queued`, `processing`, `paused`, `cancelling`, `completed`, `failed`, `cancelled`), queue position, and control actions (`pause`, `resume`, `cancel`, `delete`) | `Job Queue\|queued\|processing\|paused\|cancelling\|completed\|failed\|cancelled\|queue_position\|pause\|resume\|cancel\|delete` |
+| **Persistent Job History** | Durable history of all jobs with core metadata (timestamps, engine/model, status, chunk progress, timing metrics, output paths/URLs) | `Job History\|generation history\|created_at\|status\|processed_chunks\|total_chunks\|timing_metrics\|output_path\|audio_url\|video_url` |
 | **Models Page** | Dedicated models page shows model path/location, download status, and disk usage | `Models\|model path\|download status\|disk usage` |
 | **Settings Screen: System Folders + Output Folder** | Settings must display system/runtime folders and allow configuring output folder | `System Folders\|Application Support\|Logs\|Output Folder` |
-| **Jobs History Page + Playback** | Dedicated jobs-history page lists previous jobs and supports playback/opening generated media where relevant | `Jobs History\|History\|Playback\|Play` |
+| **Jobs History Page + Playback** | Dedicated jobs-history page lists previous jobs and supports audio/video playback plus save/download for generated media | `Jobs History\|History\|Playback\|Play\|VideoPlayer\|video_url\|audio_url\|Save\|Download` |
+| **WebSocket Queue Updates** | Queue/history reflects live job events over websocket (`job_created`, `job_update`, `job_completed`, `job_failed`, `job_cancelled`) | `job_created\|job_update\|job_completed\|job_failed\|job_cancelled\|WebSocket` |
 | **Full File Path Display** | UI surfaces full output paths and provides open/reveal-folder affordance | `Output Path\|Full Path\|Reveal in Finder\|Open Folder` |
 
 ## Audit Procedure
@@ -211,11 +212,12 @@ fi
 # MimikaCODE production UX baseline checks
 UI_DIR="$PROJECT_DIR/flutter_app/lib"
 if [ -d "$UI_DIR" ]; then
-  rg -n 'Job Queue|queued|running|completed|failed' "$UI_DIR"
-  rg -n 'Job History|generation history|created_at|duration|status|model' "$UI_DIR"
+  rg -n 'Job Queue|queued|processing|paused|cancelling|completed|failed|cancelled|queue_position|pause|resume|cancel|delete' "$UI_DIR"
+  rg -n 'Job History|generation history|created_at|status|processed_chunks|total_chunks|timing_metrics|output_path|audio_url|video_url' "$UI_DIR"
   rg -n 'Models|model path|download status|disk usage' "$UI_DIR"
   rg -n 'Settings|System Folders|Application Support|Logs|Output Folder' "$UI_DIR"
-  rg -n 'Jobs History|History|Playback|Play' "$UI_DIR"
+  rg -n 'Jobs History|History|Playback|Play|VideoPlayer|video_url|audio_url|Save|Download' "$UI_DIR"
+  rg -n 'job_created|job_update|job_completed|job_failed|job_cancelled|WebSocket' "$UI_DIR"
   rg -n 'Output Path|Full Path|Reveal in Finder|Open Folder' "$UI_DIR"
 fi
 
@@ -281,10 +283,12 @@ Output format:
 
 #### MimikaCODE Production UX Baseline
 - [x] Job Queue implemented with live status tracking
-- [ ] Job history metadata persistence incomplete (MISSING DURATION/STATUS)
+- [ ] Job queue controls incomplete (MISSING PAUSE/RESUME/CANCEL/DELETE OR CANCELLING/CANCELLED STATE)
+- [ ] Job history metadata persistence incomplete (MISSING CHUNK/TIMING/OUTPUT URL FIELDS)
 - [ ] Models page missing disk-usage view (MISSING)
 - [ ] Settings missing system-folders display (MISSING)
-- [ ] Jobs history page missing playback action (MISSING)
+- [ ] Jobs history page missing audio/video playback or save/download actions (MISSING)
+- [ ] WebSocket live queue updates missing (MISSING JOB_CREATED/JOB_UPDATE/JOB_COMPLETED/JOB_FAILED/JOB_CANCELLED)
 - [ ] Full output path not shown in result cards (MISSING)
 
 #### Issues Found

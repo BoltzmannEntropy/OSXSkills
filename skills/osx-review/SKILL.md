@@ -108,9 +108,10 @@ digraph review_flow {
 - [ ] **Footer log console**: App includes a footer system-log area that is collapsible and resizable
 - [ ] **Footer parity**: Footer log area also provides copy/export actions without navigating to settings
 - [ ] **Log export surface**: Backend provides a plain-text system log export endpoint (separate from full diagnostics bundle)
-- [ ] **Job Queue surface**: App has a visible job queue with live per-job status (`queued`, `running`, `done`/`failed`)
-- [ ] **Persistent Job History**: Job history persists across app restarts with metadata (timestamp, model, duration, status, output artifact)
-- [ ] **Jobs History playback**: App has a jobs-history UI page that supports playback/opening generated outputs where applicable
+- [ ] **Job Queue surface**: App has a visible job queue with live per-job status (`queued`, `processing`, `paused`, `cancelling`, `completed`, `failed`, `cancelled`), queue position, and controls (`pause`, `resume`, `cancel`, `delete`)
+- [ ] **Persistent Job History**: Job history persists across app restarts with metadata (created time, model/engine, status, chunk progress, timing metrics, output path/URLs)
+- [ ] **Jobs History playback**: App has a jobs-history UI page that supports audio/video playback plus save/download and open-in-folder actions for generated outputs
+- [ ] **Queue event sync**: Queue/history UI updates live from websocket events (`job_created`, `job_update`, `job_completed`, `job_failed`, `job_cancelled`)
 - [ ] **File path visibility**: Generation results and history rows show full output file paths with an `Open Folder`/`Reveal in Finder` action
 
 ### iOS/Swift
@@ -991,9 +992,10 @@ class _McpPageState extends State<McpPage> {
 - [ ] Models page exists and lists model names with local model paths
 - [ ] Models page shows model download status (`not downloaded`/`downloading`/`ready`/`error`)
 - [ ] Models page shows per-model disk usage and total model-storage usage
+- [ ] Job queue surface exists with live status transitions (`queued`, `processing`, `paused`, `cancelling`, `completed`, `failed`, `cancelled`) and controls (`pause`, `resume`, `cancel`, `delete`)
 - [ ] Jobs History page exists as a dedicated screen (not only transient toast/list in generation page)
 - [ ] Jobs History includes key metadata columns (created time, model/engine, duration, status, output path)
-- [ ] Jobs History supports playback/open action for generated media and open-in-folder/reveal actions
+- [ ] Jobs History supports audio/video playback, save/download, and open-in-folder/reveal actions
 
 ### Trial + Licensing Rationale (Required)
 - [ ] The app must surface trial state in-product so users understand remaining evaluation time without contacting support.
