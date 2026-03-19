@@ -1,0 +1,4 @@
+interface:
+  display_name: "GitHub Issue Fix"
+  short_description: "Reproduce, fix, verify, and ship issue-driven bugfixes"
+  default_prompt: "Reproduce the reported GitHub issue in the target repository, implement the smallest defensible fix, verify the original failure and recovery path, then commit and push with concise issue-linked notes."
